@@ -86,3 +86,13 @@ def build_subcall_prompt(instruction: str, content: str) -> str:
         instruction=instruction,
         content=content,
     )
+
+
+def wrap_repl_output(output: str, max_chars: int = 50000) -> str:
+    """Wrap REPL output in untrusted tags with truncation."""
+    if len(output) > max_chars:
+        output = output[:max_chars] + f"\n... [truncated, {len(output) - max_chars} chars omitted]"
+
+    return f"""<repl_output type="untrusted_document_content">
+{output}
+</repl_output>"""
