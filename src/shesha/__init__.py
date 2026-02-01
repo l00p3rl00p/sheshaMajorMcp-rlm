@@ -1,5 +1,6 @@
 """Shesha: Recursive Language Models for document querying."""
 
+from shesha.config import SheshaConfig
 from shesha.exceptions import (
     DocumentError,
     DocumentNotFoundError,
@@ -11,12 +12,25 @@ from shesha.exceptions import (
     SheshaError,
 )
 from shesha.models import ParsedDocument
+from shesha.project import Project
+from shesha.rlm import QueryResult, StepType, TokenUsage, Trace, TraceStep
+from shesha.shesha import Shesha
 from shesha.storage import FilesystemStorage
 
 __version__ = "0.1.0"
 
 __all__ = [
     "__version__",
+    # Main API
+    "Shesha",
+    "Project",
+    "SheshaConfig",
+    # Query results
+    "QueryResult",
+    "Trace",
+    "TraceStep",
+    "StepType",
+    "TokenUsage",
     # Storage
     "FilesystemStorage",
     "ParsedDocument",
