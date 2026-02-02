@@ -16,7 +16,11 @@ User Query → RLM Core Loop → Docker Sandbox
 
 **Components:** `src/shesha/{rlm,sandbox,storage,parser,llm}/`
 
-**Security:** `llm_query(instruction, content)` - instruction trusted, content wrapped in `<untrusted_document_content>` tags. Containers network-isolated (egress whitelist for LLM APIs only).
+**Security:** Two untrusted content tag patterns:
+- `llm_query(instruction, content)` - instruction trusted, content wrapped in `<untrusted_document_content>` tags
+- REPL output shown to LLM wrapped in `<repl_output type="untrusted_document_content">` tags
+
+Containers network-isolated (egress whitelist for LLM APIs only).
 
 ## Commands
 
