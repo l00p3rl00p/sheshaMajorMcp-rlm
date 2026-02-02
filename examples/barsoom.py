@@ -94,7 +94,15 @@ def format_history_prefix(history: list[tuple[str, str]]) -> str:
     """Format conversation history as context for a follow-up question."""
     if not history:
         return ""
-    return ""  # Minimal implementation
+
+    lines = ["Previous conversation:"]
+    for i, (q, a) in enumerate(history, 1):
+        lines.append(f"Q{i}: {q}")
+        lines.append(f"A{i}: {a}")
+        lines.append("")  # blank line between exchanges
+
+    lines.append("Current question:")
+    return "\n".join(lines)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

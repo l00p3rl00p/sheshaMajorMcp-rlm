@@ -197,3 +197,15 @@ class TestHistoryFormatting:
 
         result = format_history_prefix([])
         assert result == ""
+
+    def test_format_history_prefix_single_exchange(self) -> None:
+        """Single exchange formats correctly."""
+        from examples.barsoom import format_history_prefix
+
+        history = [("Who is Dejah Thoris?", "She is the Princess of Helium.")]
+        result = format_history_prefix(history)
+
+        assert "Previous conversation:" in result
+        assert "Q1: Who is Dejah Thoris?" in result
+        assert "A1: She is the Princess of Helium." in result
+        assert "Current question:" in result
