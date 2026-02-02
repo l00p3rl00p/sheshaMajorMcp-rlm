@@ -111,6 +111,7 @@ class Shesha:
 
     def start(self) -> None:
         """Start the container pool."""
+        self._stopped = False
         self._pool.start()
 
     def stop(self) -> None:

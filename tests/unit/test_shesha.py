@@ -62,3 +62,24 @@ class TestShesha:
 
             # The parser should now be in the registry
             assert mock_parser in shesha._parser_registry._parsers
+
+    def test_stop_after_restart_stops_pool(self, tmp_path: Path):
+        """Stop after start-stop-start cycle should stop the pool."""
+        mock_pool = MagicMock()
+        with patch("shesha.shesha.ContainerPool", return_value=mock_pool):
+            shesha = Shesha(model="test-model", storage_path=tmp_path)
+
+            # First cycle: start then stop
+            shesha.start()
+            shesha.stop()
+
+            # Second cycle: start again
+            shesha.start()
+
+            # Reset call count to track second stop
+            mock_pool.stop.reset_mock()
+
+            # Second stop should call pool.stop()
+            shesha.stop()
+
+            mock_pool.stop.assert_called_once()
