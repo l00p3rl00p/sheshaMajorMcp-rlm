@@ -1,5 +1,7 @@
 # Security Policy
 
+Note that your author is *not* a security expert. I have tried to implement some basic sanity in this project, but you should probably review this carefully.
+
 ## Threat Model
 
 Shesha executes LLM-generated code in Docker containers. The primary threats are:
@@ -13,7 +15,9 @@ Shesha executes LLM-generated code in Docker containers. The primary threats are
 
 ### 1. Prompt Injection Mitigation
 
-- **Untrusted Content Tags**: All document content is wrapped in `<untrusted_document_content>` tags
+- **Untrusted Content Tags**: Two patterns used:
+  - `<untrusted_document_content>` wraps content in sub-LLM calls via `llm_query()`
+  - `<repl_output type="untrusted_document_content">` wraps REPL execution output shown to the main LLM
 - **Hardened System Prompt**: Explicit warnings about adversarial content
 - **Instruction/Content Separation**: `llm_query(instruction, content)` keeps trusted instructions separate from untrusted document data
 

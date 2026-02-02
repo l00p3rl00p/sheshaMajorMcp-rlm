@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 from shesha.rlm.engine import QueryResult, RLMEngine, extract_code_blocks
+from shesha.rlm.trace import StepType, TokenUsage, Trace
 
 
 def test_extract_code_blocks_finds_repl():
@@ -31,8 +32,6 @@ x = 1
 
 def test_query_result_dataclass():
     """QueryResult stores query results."""
-    from shesha.rlm.trace import TokenUsage, Trace
-
     result = QueryResult(
         answer="The answer",
         trace=Trace(),
@@ -83,3 +82,116 @@ class TestRLMEngine:
 
         assert result.answer == "The answer is 42"
         assert len(result.trace.steps) > 0
+
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("shesha.rlm.engine.LLMClient")
+    def test_engine_calls_on_progress_callback(
+        self,
+        mock_llm_cls: MagicMock,
+        mock_executor_cls: MagicMock,
+    ):
+        """Engine calls on_progress callback for each step."""
+        # Mock LLM to return code with FINAL
+        mock_llm = MagicMock()
+        mock_llm.complete.return_value = MagicMock(
+            content='```repl\nFINAL("Done")\n```',
+            prompt_tokens=100,
+            completion_tokens=50,
+            total_tokens=150,
+        )
+        mock_llm_cls.return_value = mock_llm
+
+        # Mock executor
+        mock_executor = MagicMock()
+        mock_executor.execute.return_value = MagicMock(
+            status="ok",
+            stdout="output",
+            stderr="",
+            error=None,
+            final_answer="Done",
+        )
+        mock_executor_cls.return_value = mock_executor
+
+        # Track callback invocations
+        progress_calls: list[tuple[StepType, int]] = []
+
+        def on_progress(step_type: StepType, iteration: int, content: str) -> None:
+            progress_calls.append((step_type, iteration))
+
+        engine = RLMEngine(model="test-model")
+        result = engine.query(
+            documents=["Doc content"],
+            question="Test?",
+            on_progress=on_progress,
+        )
+
+        assert result.answer == "Done"
+        # Should have at least CODE_GENERATED, CODE_OUTPUT, FINAL_ANSWER
+        step_types = [call[0] for call in progress_calls]
+        assert StepType.CODE_GENERATED in step_types
+        assert StepType.CODE_OUTPUT in step_types
+        assert StepType.FINAL_ANSWER in step_types
+
+    @patch("shesha.rlm.engine.LLMClient")
+    def test_engine_returns_error_for_oversized_subcall_content(
+        self,
+        mock_llm_cls: MagicMock,
+    ):
+        """Engine returns error string when subcall content exceeds limit."""
+        # Create engine with small limit for testing
+        engine = RLMEngine(model="test-model", max_subcall_content_chars=1000)
+
+        # Call _handle_llm_query directly with oversized content
+        trace = Trace()
+        token_usage = TokenUsage()
+        large_content = "x" * 5000  # 5K chars, exceeds 1K limit
+
+        result = engine._handle_llm_query(
+            instruction="Summarize this",
+            content=large_content,
+            trace=trace,
+            token_usage=token_usage,
+            iteration=0,
+        )
+
+        # Should return error string, not call the LLM
+        assert "Error" in result
+        assert "5,000" in result or "5000" in result  # actual size
+        assert "1,000" in result or "1000" in result  # limit
+        assert "chunk" in result.lower()  # guidance to chunk smaller
+        mock_llm_cls.assert_not_called()  # No sub-LLM call made
+
+    @patch("shesha.rlm.engine.LLMClient")
+    def test_engine_allows_subcall_content_under_limit(
+        self,
+        mock_llm_cls: MagicMock,
+    ):
+        """Engine makes sub-LLM call when content is under limit."""
+        # Mock sub-LLM
+        mock_sub_llm = MagicMock()
+        mock_sub_llm.complete.return_value = MagicMock(
+            content="Analysis result",
+            prompt_tokens=50,
+            completion_tokens=25,
+            total_tokens=75,
+        )
+        mock_llm_cls.return_value = mock_sub_llm
+
+        # Create engine with reasonable limit
+        engine = RLMEngine(model="test-model", max_subcall_content_chars=10000)
+
+        trace = Trace()
+        token_usage = TokenUsage()
+        small_content = "x" * 500  # 500 chars, under 10K limit
+
+        result = engine._handle_llm_query(
+            instruction="Summarize this",
+            content=small_content,
+            trace=trace,
+            token_usage=token_usage,
+            iteration=0,
+        )
+
+        # Should return LLM response
+        assert result == "Analysis result"
+        mock_llm_cls.assert_called_once()  # Sub-LLM was called

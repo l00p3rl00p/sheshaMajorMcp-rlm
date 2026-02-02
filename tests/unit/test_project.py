@@ -7,6 +7,7 @@ import pytest
 
 from shesha.models import ParsedDocument
 from shesha.project import Project
+from shesha.rlm.trace import StepType
 
 
 @pytest.fixture
@@ -71,3 +72,47 @@ class TestProject:
         project.delete_document("old.txt")
 
         mock_storage.delete_document.assert_called_with("test-project", "old.txt")
+
+    def test_query_passes_on_progress_to_engine(
+        self, mock_storage: MagicMock, mock_registry: MagicMock
+    ):
+        """Query passes on_progress callback and documents to RLM engine."""
+        # Mock the engine
+        mock_engine = MagicMock()
+        mock_engine.query.return_value = MagicMock(answer="test answer")
+
+        # Mock storage.load_all_documents to return real document objects
+        mock_storage.load_all_documents.return_value = [
+            ParsedDocument(
+                name="doc.txt",
+                content="doc content",
+                format="txt",
+                metadata={},
+                char_count=11,
+                parse_warnings=[],
+            )
+        ]
+
+        project = Project(
+            project_id="test-project",
+            storage=mock_storage,
+            parser_registry=mock_registry,
+            rlm_engine=mock_engine,
+        )
+
+        # Create a callback
+        def on_progress(step_type: StepType, iteration: int, content: str) -> None:
+            pass
+
+        project.query("test question", on_progress=on_progress)
+
+        # Verify load_all_documents was called with project_id
+        mock_storage.load_all_documents.assert_called_once_with("test-project")
+
+        # Verify engine.query received correct arguments
+        mock_engine.query.assert_called_once()
+        call_kwargs = mock_engine.query.call_args.kwargs
+        assert call_kwargs.get("on_progress") is on_progress
+        assert call_kwargs.get("documents") == ["doc content"]
+        assert call_kwargs.get("doc_names") == ["doc.txt"]
+        assert call_kwargs.get("question") == "test question"

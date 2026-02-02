@@ -16,7 +16,11 @@ User Query → RLM Core Loop → Docker Sandbox
 
 **Components:** `src/shesha/{rlm,sandbox,storage,parser,llm}/`
 
-**Security:** `llm_query(instruction, content)` - instruction trusted, content wrapped in `<untrusted_document_content>` tags. Containers network-isolated (egress whitelist for LLM APIs only).
+**Security:** Two untrusted content tag patterns:
+- `llm_query(instruction, content)` - instruction trusted, content wrapped in `<untrusted_document_content>` tags
+- REPL output shown to LLM wrapped in `<repl_output type="untrusted_document_content">` tags
+
+Containers network-isolated (egress whitelist for LLM APIs only).
 
 ## Commands
 
@@ -48,6 +52,18 @@ make all                         # Format + lint + typecheck + test
 - Skipping red phase
 - More code than needed to pass
 - Untested code "because it's simple"
+
+## Code Style
+
+- **Imports at top of file:** All imports must be at the top of the file, not inside functions or methods. If an import cannot be at the top (e.g., circular import, optional dependency), add a comment explaining why.
+
+- **Exception handling:** Never silently swallow exceptions with bare `except: pass` or `except Exception: pass`. If ignoring an exception is intentional (e.g., cleanup code where failure is acceptable), add a comment explaining why. Example:
+  ```python
+  try:
+      container.stop()
+  except Exception:
+      pass  # Container may already be stopped
+  ```
 
 ## Design Decisions
 

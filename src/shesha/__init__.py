@@ -13,7 +13,7 @@ from shesha.exceptions import (
 )
 from shesha.models import ParsedDocument
 from shesha.project import Project
-from shesha.rlm import QueryResult, StepType, TokenUsage, Trace, TraceStep
+from shesha.rlm import ProgressCallback, QueryResult, StepType, TokenUsage, Trace, TraceStep
 from shesha.shesha import Shesha
 from shesha.storage import FilesystemStorage
 
@@ -26,6 +26,7 @@ __all__ = [
     "Project",
     "SheshaConfig",
     # Query results
+    "ProgressCallback",
     "QueryResult",
     "Trace",
     "TraceStep",

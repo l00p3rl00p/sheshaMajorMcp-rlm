@@ -1,5 +1,7 @@
 """Main Shesha class - the public API."""
 
+import atexit
+import weakref
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -61,6 +63,19 @@ class Shesha:
             execution_timeout=config.execution_timeout_sec,
         )
 
+        # Track if stopped to avoid double-cleanup
+        self._stopped = False
+
+        # Register cleanup on exit using weak reference
+        weak_self = weakref.ref(self)
+
+        def _cleanup() -> None:
+            obj = weak_self()
+            if obj is not None:
+                obj.stop()
+
+        atexit.register(_cleanup)
+
     def create_project(self, project_id: str) -> Project:
         """Create a new project."""
         self._storage.create_project(project_id)
@@ -96,10 +111,14 @@ class Shesha:
 
     def start(self) -> None:
         """Start the container pool."""
+        self._stopped = False
         self._pool.start()
 
     def stop(self) -> None:
         """Stop the container pool."""
+        if self._stopped:
+            return
+        self._stopped = True
         self._pool.stop()
 
     def __enter__(self) -> "Shesha":
