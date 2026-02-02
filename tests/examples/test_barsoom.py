@@ -1,7 +1,5 @@
 """Tests for the barsoom example."""
 
-import time
-
 from examples.barsoom import (
     BOOKS,
     ThinkingSpinner,
@@ -125,19 +123,16 @@ class TestThinkingSpinner:
         """Spinner can be started and stopped without errors."""
         spinner = ThinkingSpinner()
         spinner.start()
-        time.sleep(0.1)  # Let it run briefly
         spinner.stop()
-        # Should not raise
+        # Should not raise - no sleep needed since we're testing lifecycle, not output
 
     def test_spinner_stop_clears_line(self, capsys) -> None:
         """Spinner.stop() clears the thinking message."""
         spinner = ThinkingSpinner()
         spinner.start()
-        time.sleep(0.05)
         spinner.stop()
-        # After stop, the line should be cleared (carriage return + spaces)
+        # stop() always prints "\r" to clear the line, regardless of thread timing
         captured = capsys.readouterr()
-        # Output should end with carriage return (clearing the line)
         assert "\r" in captured.out
 
 
