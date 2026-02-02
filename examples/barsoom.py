@@ -134,8 +134,9 @@ def main() -> None:
             break
 
         try:
+            print("Thinking...", end="", flush=True)
             result = project.query(user_input)
-            print()
+            print("\r" + " " * 12 + "\r", end="")  # Clear "Thinking..."
             print(result.answer)
             print()
 
