@@ -209,3 +209,21 @@ class TestHistoryFormatting:
         assert "Q1: Who is Dejah Thoris?" in result
         assert "A1: She is the Princess of Helium." in result
         assert "Current question:" in result
+
+    def test_format_history_prefix_multiple_exchanges(self) -> None:
+        """Multiple exchanges format with correct numbering."""
+        from examples.barsoom import format_history_prefix
+
+        history = [
+            ("Question one?", "Answer one."),
+            ("Question two?", "Answer two."),
+            ("Question three?", "Answer three."),
+        ]
+        result = format_history_prefix(history)
+
+        assert "Q1: Question one?" in result
+        assert "A1: Answer one." in result
+        assert "Q2: Question two?" in result
+        assert "A2: Answer two." in result
+        assert "Q3: Question three?" in result
+        assert "A3: Answer three." in result
