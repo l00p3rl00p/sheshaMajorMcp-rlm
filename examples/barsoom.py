@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from shesha import Shesha
+from shesha.config import SheshaConfig
 from shesha.rlm.trace import TokenUsage, Trace
 
 BOOKS = {
@@ -85,11 +86,20 @@ def main() -> None:
     # Check for API key
     if not os.environ.get("SHESHA_API_KEY"):
         print("Error: SHESHA_API_KEY environment variable not set.")
-        print("Set it with: export SHESHA_API_KEY=your-api-key")
+        print()
+        print("Environment variables:")
+        print("  SHESHA_API_KEY   (required) API key for your LLM provider")
+        print("  SHESHA_MODEL     (optional) Model name, e.g.:")
+        print("                   - claude-sonnet-4-20250514 (default, Anthropic)")
+        print("                   - gpt-4o (OpenAI)")
+        print("                   - gemini/gemini-1.5-pro (Google)")
+        print()
+        print("The provider is auto-detected from the model name via LiteLLM.")
         sys.exit(1)
 
-    # Initialize Shesha
-    shesha = Shesha(storage_path=STORAGE_PATH)
+    # Initialize Shesha with config from environment
+    config = SheshaConfig.load(storage_path=STORAGE_PATH)
+    shesha = Shesha(config=config)
 
     # Check if project exists
     project_exists = PROJECT_NAME in shesha.list_projects()
