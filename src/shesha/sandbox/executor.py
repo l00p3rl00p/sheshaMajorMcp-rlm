@@ -73,17 +73,17 @@ class ContainerExecutor:
             try:
                 self._container.stop(timeout=5)
             except Exception:
-                pass
+                pass  # Container may already be stopped or removed
             try:
                 self._container.remove(force=True)
             except Exception:
-                pass
+                pass  # Container may already be removed
             self._container = None
         if self._client:
             try:
                 self._client.close()
             except Exception:
-                pass
+                pass  # Client may already be closed or daemon unavailable
             self._client = None
 
     def setup_context(self, context: list[str]) -> None:
@@ -174,7 +174,10 @@ class ContainerExecutor:
             while len(self._raw_buffer) < 8:
                 chunk = self._socket._sock.recv(4096)
                 if not chunk:
-                    # Connection closed - return what we have in content buffer
+                    # Connection closed - return what we have in both buffers
+                    # Include _raw_buffer as it may contain trailing content
+                    self._content_buffer += self._raw_buffer
+                    self._raw_buffer = b""
                     result = self._content_buffer.decode().strip()
                     self._content_buffer = b""
                     return result

@@ -53,6 +53,14 @@ make all                         # Format + lint + typecheck + test
 
 - **Imports at top of file:** All imports must be at the top of the file, not inside functions or methods. If an import cannot be at the top (e.g., circular import, optional dependency), add a comment explaining why.
 
+- **Exception handling:** Never silently swallow exceptions with bare `except: pass` or `except Exception: pass`. If ignoring an exception is intentional (e.g., cleanup code where failure is acceptable), add a comment explaining why. Example:
+  ```python
+  try:
+      container.stop()
+  except Exception:
+      pass  # Container may already be stopped
+  ```
+
 ## Design Decisions
 
 - Sub-LLM depth = 1 (plain LLM, not recursive) for predictable cost

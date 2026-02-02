@@ -72,7 +72,7 @@ class TestDockerFrameParsing:
         """
         # Create a payload that results in length bytes containing 0x80
         # Length 32768 (0x8000) has 0x80 in high byte
-        large_payload = b"x" * 200 + b'{"result": "done"}\n'
+        large_payload = b"x" * 32749 + b'{"result": "done"}\n'  # Total 32768 bytes
 
         stream_data = make_docker_frame(large_payload)
 
@@ -111,7 +111,7 @@ class TestDockerFrameParsing:
 
         # Second frame: large payload with 0x80 in length field
         # 32774 bytes triggers length = 0x00008006, containing 0x80
-        part2 = b"A" * 32760 + b'done"}\n'  # Total ~32774 bytes
+        part2 = b"A" * 32767 + b'done"}\n'  # Total 32774 bytes
 
         stream_data = make_docker_frame(part1) + make_docker_frame(part2)
 
@@ -141,8 +141,84 @@ class TestDockerFrameParsing:
         assert result.startswith('{"status": "ok"')
         assert result.endswith('done"}')
         # The content should be exactly the two payloads concatenated
-        expected = '{"status": "ok", "content": "' + "A" * 32760 + 'done"}'
+        expected = '{"status": "ok", "content": "' + "A" * 32767 + 'done"}'
         assert result == expected
+
+
+class TestConnectionClose:
+    """Tests for connection close handling in _read_line."""
+
+    def test_read_line_preserves_raw_buffer_on_connection_close(self):
+        """_read_line includes _raw_buffer contents when connection closes.
+
+        When recv() returns b"" while waiting for 8 bytes (Docker header),
+        any bytes already in _raw_buffer should be included in the result,
+        not silently dropped.
+
+        This tests the specific bug: if we have <8 bytes in raw_buffer when
+        connection closes, those bytes were being silently dropped.
+        """
+        mock_socket = MagicMock()
+
+        # Simulate: first recv gets 5 bytes (< 8), second recv gets connection close
+        # This hits the bug path at lines 174-180
+        chunks = [b'hello', b""]  # 5 bytes, then close
+        chunk_iter = iter(chunks)
+
+        def mock_recv(size):
+            try:
+                return next(chunk_iter)
+            except StopIteration:
+                return b""
+
+        mock_socket._sock.recv = mock_recv
+        mock_socket._sock.settimeout = MagicMock()
+
+        executor = ContainerExecutor()
+        executor._socket = mock_socket
+        executor._raw_buffer = b""
+        executor._content_buffer = b""
+
+        result = executor._read_line(timeout=5)
+
+        # Should include the 5-byte data, not return empty
+        assert result == "hello"
+
+    def test_read_line_returns_content_buffer_on_close_with_partial_header(self):
+        """_read_line returns content_buffer when connection closes mid-header.
+
+        If we have valid content in _content_buffer and partial header bytes
+        in _raw_buffer when connection closes, we should return the content.
+        """
+        mock_socket = MagicMock()
+
+        # Simulate: get a complete frame, then partial header, then close
+        frame1 = make_docker_frame(b'{"status": "ok"}')
+        partial_header = b"\x01\x00\x00"  # 3 bytes of a Docker header
+
+        chunks = [frame1 + partial_header, b""]
+        chunk_iter = iter(chunks)
+
+        def mock_recv(size):
+            try:
+                return next(chunk_iter)
+            except StopIteration:
+                return b""
+
+        mock_socket._sock.recv = mock_recv
+        mock_socket._sock.settimeout = MagicMock()
+
+        executor = ContainerExecutor()
+        executor._socket = mock_socket
+        executor._raw_buffer = b""
+        executor._content_buffer = b""
+
+        # Note: This will include partial header bytes which may cause issues,
+        # but that's the correct behavior - don't silently drop data
+        result = executor._read_line(timeout=5)
+
+        # Should at least include the valid content from frame1
+        assert '{"status": "ok"}' in result
 
 
 class TestContainerExecutor:

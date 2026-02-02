@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 from shesha.rlm.engine import QueryResult, RLMEngine, extract_code_blocks
+from shesha.rlm.trace import StepType, TokenUsage, Trace
 
 
 def test_extract_code_blocks_finds_repl():
@@ -31,8 +32,6 @@ x = 1
 
 def test_query_result_dataclass():
     """QueryResult stores query results."""
-    from shesha.rlm.trace import TokenUsage, Trace
-
     result = QueryResult(
         answer="The answer",
         trace=Trace(),
@@ -92,8 +91,6 @@ class TestRLMEngine:
         mock_executor_cls: MagicMock,
     ):
         """Engine calls on_progress callback for each step."""
-        from shesha.rlm.trace import StepType
-
         # Mock LLM to return code with FINAL
         mock_llm = MagicMock()
         mock_llm.complete.return_value = MagicMock(
@@ -141,8 +138,6 @@ class TestRLMEngine:
         mock_llm_cls: MagicMock,
     ):
         """Engine returns error string when subcall content exceeds limit."""
-        from shesha.rlm.trace import TokenUsage, Trace
-
         # Create engine with small limit for testing
         engine = RLMEngine(model="test-model", max_subcall_content_chars=1000)
 
@@ -172,8 +167,6 @@ class TestRLMEngine:
         mock_llm_cls: MagicMock,
     ):
         """Engine makes sub-LLM call when content is under limit."""
-        from shesha.rlm.trace import TokenUsage, Trace
-
         # Mock sub-LLM
         mock_sub_llm = MagicMock()
         mock_sub_llm.complete.return_value = MagicMock(

@@ -7,6 +7,7 @@ import pytest
 
 from shesha.models import ParsedDocument
 from shesha.project import Project
+from shesha.rlm.trace import StepType
 
 
 @pytest.fixture
@@ -76,8 +77,6 @@ class TestProject:
         self, mock_storage: MagicMock, mock_registry: MagicMock
     ):
         """Query passes on_progress callback to RLM engine."""
-        from shesha.rlm.trace import StepType
-
         # Mock the engine
         mock_engine = MagicMock()
         mock_engine.query.return_value = MagicMock(answer="test answer")
