@@ -79,6 +79,13 @@ def is_exit_command(user_input: str) -> bool:
     return user_input.lower() in ("quit", "exit")
 
 
+def format_thought_time(elapsed_seconds: float) -> str:
+    """Format elapsed time as '[Thought for N seconds]'."""
+    seconds = round(elapsed_seconds)
+    unit = "second" if seconds == 1 else "seconds"
+    return f"[Thought for {seconds} {unit}]"
+
+
 def format_stats(execution_time: float, token_usage: TokenUsage, trace: Trace) -> str:
     """Format verbose stats for display after an answer."""
     prompt = token_usage.prompt_tokens
@@ -235,6 +242,8 @@ def main() -> None:
             result = project.query(args.prompt, on_progress=on_progress)
             spinner.stop()
 
+            elapsed = time.time() - query_start_time
+            print(format_thought_time(elapsed))
             print(result.answer)
             print()
 
@@ -300,6 +309,8 @@ def main() -> None:
             result = project.query(full_question, on_progress=on_progress)
             spinner.stop()
 
+            elapsed = time.time() - query_start_time
+            print(format_thought_time(elapsed))
             print(result.answer)
             print()
 

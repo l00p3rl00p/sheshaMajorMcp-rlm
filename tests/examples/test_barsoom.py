@@ -10,6 +10,7 @@ from examples.barsoom import (
     format_history_prefix,
     format_progress,
     format_stats,
+    format_thought_time,
     is_exit_command,
     parse_args,
     should_warn_history_size,
@@ -254,3 +255,27 @@ class TestHistoryWarning:
     def test_should_warn_empty_history(self) -> None:
         """Empty history should not warn."""
         assert should_warn_history_size([]) is False
+
+
+class TestThoughtTimeFormatting:
+    """Test elapsed thought time formatting."""
+
+    def test_format_thought_time_integer_seconds(self) -> None:
+        """Formats whole seconds without decimal."""
+        result = format_thought_time(5.0)
+        assert result == "[Thought for 5 seconds]"
+
+    def test_format_thought_time_rounds_to_integer(self) -> None:
+        """Rounds fractional seconds to nearest integer."""
+        assert format_thought_time(5.4) == "[Thought for 5 seconds]"
+        assert format_thought_time(5.6) == "[Thought for 6 seconds]"
+
+    def test_format_thought_time_one_second(self) -> None:
+        """Uses singular 'second' for 1 second."""
+        result = format_thought_time(1.0)
+        assert result == "[Thought for 1 second]"
+
+    def test_format_thought_time_zero_seconds(self) -> None:
+        """Handles zero seconds."""
+        result = format_thought_time(0.4)
+        assert result == "[Thought for 0 seconds]"
