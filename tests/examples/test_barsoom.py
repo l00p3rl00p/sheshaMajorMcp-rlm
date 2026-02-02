@@ -227,3 +227,19 @@ class TestHistoryFormatting:
         assert "A2: Answer two." in result
         assert "Q3: Question three?" in result
         assert "A3: Answer three." in result
+
+
+class TestHistoryWarning:
+    """Test conversation history size warnings."""
+
+    def test_should_warn_at_exchange_limit(self) -> None:
+        """Warn when exchange count reaches threshold."""
+        from examples.barsoom import HISTORY_WARN_EXCHANGES, should_warn_history_size
+
+        # Just under limit - no warning
+        history = [("q", "a") for _ in range(HISTORY_WARN_EXCHANGES - 1)]
+        assert should_warn_history_size(history) is False
+
+        # At limit - warn
+        history.append(("q", "a"))
+        assert should_warn_history_size(history) is True

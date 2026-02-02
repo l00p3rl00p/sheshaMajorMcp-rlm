@@ -22,6 +22,9 @@ BOOKS = {
     "barsoom-7.txt": "A Fighting Man of Mars",
 }
 
+HISTORY_WARN_CHARS = 50_000
+HISTORY_WARN_EXCHANGES = 10
+
 
 class ThinkingSpinner:
     """Animated spinner that shows 'Thinking...' with animated dots."""
@@ -105,6 +108,13 @@ def format_history_prefix(history: list[tuple[str, str]]) -> str:
     return "\n".join(lines)
 
 
+def should_warn_history_size(history: list[tuple[str, str]]) -> bool:
+    """Check if history is large enough to warrant a warning."""
+    if len(history) >= HISTORY_WARN_EXCHANGES:
+        return True
+    return False
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Explore the Barsoom novels using Shesha RLM")
@@ -161,9 +171,8 @@ def _install_urllib3_cleanup_hook() -> None:
     original_hook = sys.unraisablehook
 
     def suppress_urllib3_error(unraisable: sys.UnraisableHookArgs) -> None:
-        if (
-            unraisable.exc_type is ValueError
-            and "I/O operation on closed file" in str(unraisable.exc_value)
+        if unraisable.exc_type is ValueError and "I/O operation on closed file" in str(
+            unraisable.exc_value
         ):
             return
         original_hook(unraisable)
