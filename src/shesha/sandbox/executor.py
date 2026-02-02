@@ -174,10 +174,19 @@ class ContainerExecutor:
             while len(self._raw_buffer) < 8:
                 chunk = self._socket._sock.recv(4096)
                 if not chunk:
-                    # Connection closed - return what we have in both buffers
-                    # Include _raw_buffer as it may contain trailing content
-                    self._content_buffer += self._raw_buffer
-                    self._raw_buffer = b""
+                    # Connection closed while waiting for Docker header
+                    # Check if _raw_buffer looks like a partial Docker header
+                    # (starts with stream type 1 or 2) - if so, discard it
+                    # as it contains binary length bytes that would cause
+                    # UnicodeDecodeError. Otherwise, it might be plain text
+                    # from a non-multiplexed stream, so try to decode it.
+                    if self._raw_buffer and self._raw_buffer[0] in (1, 2):
+                        # Partial Docker header - discard binary bytes
+                        self._raw_buffer = b""
+                    else:
+                        # Possibly plain text - add to content buffer
+                        self._content_buffer += self._raw_buffer
+                        self._raw_buffer = b""
                     result = self._content_buffer.decode().strip()
                     self._content_buffer = b""
                     return result

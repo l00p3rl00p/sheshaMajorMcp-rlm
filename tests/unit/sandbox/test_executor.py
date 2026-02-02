@@ -185,10 +185,11 @@ class TestConnectionClose:
         assert result == "hello"
 
     def test_read_line_returns_content_buffer_on_close_with_partial_header(self):
-        """_read_line returns content_buffer when connection closes mid-header.
+        """_read_line returns only content_buffer when connection closes mid-header.
 
         If we have valid content in _content_buffer and partial header bytes
-        in _raw_buffer when connection closes, we should return the content.
+        in _raw_buffer when connection closes, we should return ONLY the content,
+        not the binary header bytes (which would cause decode errors or garbage).
         """
         mock_socket = MagicMock()
 
@@ -213,12 +214,46 @@ class TestConnectionClose:
         executor._raw_buffer = b""
         executor._content_buffer = b""
 
-        # Note: This will include partial header bytes which may cause issues,
-        # but that's the correct behavior - don't silently drop data
         result = executor._read_line(timeout=5)
 
-        # Should at least include the valid content from frame1
-        assert '{"status": "ok"}' in result
+        # Should return ONLY the valid content from frame1, NOT the partial header
+        assert result == '{"status": "ok"}'
+
+    def test_read_line_handles_binary_header_bytes_on_connection_close(self):
+        """_read_line must not raise UnicodeDecodeError when partial header contains 0x80.
+
+        When connection closes with partial Docker header in _raw_buffer containing
+        bytes >= 0x80 (invalid UTF-8 start bytes), the code must not crash.
+        """
+        mock_socket = MagicMock()
+
+        # Simulate: get a complete frame, then partial header with 0x80 byte, then close
+        frame1 = make_docker_frame(b'{"result": "data"}')
+        # Partial header: stream type 1, padding, then 0x80 (invalid UTF-8)
+        partial_header_with_0x80 = b"\x01\x00\x00\x00\x80"
+
+        chunks = [frame1 + partial_header_with_0x80, b""]
+        chunk_iter = iter(chunks)
+
+        def mock_recv(size):
+            try:
+                return next(chunk_iter)
+            except StopIteration:
+                return b""
+
+        mock_socket._sock.recv = mock_recv
+        mock_socket._sock.settimeout = MagicMock()
+
+        executor = ContainerExecutor()
+        executor._socket = mock_socket
+        executor._raw_buffer = b""
+        executor._content_buffer = b""
+
+        # This should NOT raise UnicodeDecodeError
+        result = executor._read_line(timeout=5)
+
+        # Should return only the valid content, discarding the partial header
+        assert result == '{"result": "data"}'
 
 
 class TestContainerExecutor:
