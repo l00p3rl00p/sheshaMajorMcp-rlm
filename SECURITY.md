@@ -46,10 +46,6 @@ Security-relevant settings in `SheshaConfig`:
 | `max_output_chars` | 50000 | Truncate large outputs |
 | `allowed_hosts` | LLM APIs only | Network egress whitelist |
 
-## Reporting Vulnerabilities
-
-Please report security vulnerabilities via GitHub Security Advisories.
-
 ## Disclaimer
 
 Shesha provides defense-in-depth but cannot guarantee perfect isolation. Do not process highly sensitive documents without additional security review.
