@@ -1,6 +1,15 @@
 """Tests for the barsoom example."""
 
-from examples.barsoom import BOOKS, format_stats, is_exit_command, parse_args
+import time
+
+from examples.barsoom import (
+    BOOKS,
+    ThinkingSpinner,
+    format_progress,
+    format_stats,
+    is_exit_command,
+    parse_args,
+)
 from shesha.rlm.trace import StepType, TokenUsage, Trace
 
 
@@ -107,3 +116,51 @@ class TestVerboseOutput:
         trace = Trace()
         output = format_stats(execution_time=1.0, token_usage=token_usage, trace=trace)
         assert output.startswith("---")
+
+
+class TestThinkingSpinner:
+    """Test the animated thinking spinner."""
+
+    def test_spinner_starts_and_stops(self) -> None:
+        """Spinner can be started and stopped without errors."""
+        spinner = ThinkingSpinner()
+        spinner.start()
+        time.sleep(0.1)  # Let it run briefly
+        spinner.stop()
+        # Should not raise
+
+    def test_spinner_stop_clears_line(self, capsys) -> None:
+        """Spinner.stop() clears the thinking message."""
+        spinner = ThinkingSpinner()
+        spinner.start()
+        time.sleep(0.05)
+        spinner.stop()
+        # After stop, the line should be cleared (carriage return + spaces)
+        captured = capsys.readouterr()
+        # Output should end with carriage return (clearing the line)
+        assert "\r" in captured.out
+
+
+class TestProgressFormatting:
+    """Test verbose progress formatting."""
+
+    def test_format_progress_code_generated(self) -> None:
+        """format_progress handles CODE_GENERATED step."""
+        output = format_progress(StepType.CODE_GENERATED, iteration=0, content="code")
+        assert "Iteration 1" in output or "iteration 1" in output.lower()
+        assert "generating" in output.lower() or "code" in output.lower()
+
+    def test_format_progress_code_output(self) -> None:
+        """format_progress handles CODE_OUTPUT step."""
+        output = format_progress(StepType.CODE_OUTPUT, iteration=0, content="output")
+        assert "execut" in output.lower() or "output" in output.lower()
+
+    def test_format_progress_subcall(self) -> None:
+        """format_progress handles SUBCALL_REQUEST step."""
+        output = format_progress(StepType.SUBCALL_REQUEST, iteration=0, content="query")
+        assert "sub" in output.lower() or "llm" in output.lower()
+
+    def test_format_progress_final(self) -> None:
+        """format_progress handles FINAL_ANSWER step."""
+        output = format_progress(StepType.FINAL_ANSWER, iteration=2, content="answer")
+        assert "final" in output.lower() or "answer" in output.lower()

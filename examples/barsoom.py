@@ -4,11 +4,13 @@
 import argparse
 import os
 import sys
+import threading
+import time
 from pathlib import Path
 
 from shesha import Shesha
 from shesha.config import SheshaConfig
-from shesha.rlm.trace import TokenUsage, Trace
+from shesha.rlm.trace import StepType, TokenUsage, Trace
 
 BOOKS = {
     "barsoom-1.txt": "A Princess of Mars",
@@ -19,6 +21,50 @@ BOOKS = {
     "barsoom-6.txt": "The Master Mind of Mars",
     "barsoom-7.txt": "A Fighting Man of Mars",
 }
+
+
+class ThinkingSpinner:
+    """Animated spinner that shows 'Thinking...' with animated dots."""
+
+    def __init__(self) -> None:
+        self._running = False
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        """Start the spinner animation."""
+        self._running = True
+        self._thread = threading.Thread(target=self._animate, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        """Stop the spinner and clear the line."""
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=0.5)
+        # Clear the line
+        print("\r" + " " * 20 + "\r", end="", flush=True)
+
+    def _animate(self) -> None:
+        """Animation loop running in background thread."""
+        dots = 0
+        while self._running:
+            dots = (dots % 3) + 1
+            print(f"\rThinking{'.' * dots}{' ' * (3 - dots)}", end="", flush=True)
+            time.sleep(0.3)
+
+
+def format_progress(step_type: StepType, iteration: int, content: str) -> str:
+    """Format a progress message for verbose output."""
+    step_names = {
+        StepType.CODE_GENERATED: "Generating code",
+        StepType.CODE_OUTPUT: "Executing code",
+        StepType.SUBCALL_REQUEST: "Sub-LLM query",
+        StepType.SUBCALL_RESPONSE: "Sub-LLM response",
+        StepType.FINAL_ANSWER: "Final answer",
+        StepType.ERROR: "Error",
+    }
+    step_name = step_names.get(step_type, step_type.value)
+    return f"  [Iteration {iteration + 1}] {step_name}"
 
 
 def is_exit_command(user_input: str) -> bool:
@@ -134,9 +180,19 @@ def main() -> None:
             break
 
         try:
-            print("Thinking...", end="", flush=True)
-            result = project.query(user_input)
-            print("\r" + " " * 12 + "\r", end="")  # Clear "Thinking..."
+            spinner = ThinkingSpinner()
+            spinner.start()
+
+            # Progress callback for verbose mode
+            def on_progress(step_type: StepType, iteration: int, content: str) -> None:
+                if args.verbose:
+                    spinner.stop()
+                    print(format_progress(step_type, iteration, content))
+                    spinner.start()
+
+            result = project.query(user_input, on_progress=on_progress)
+            spinner.stop()
+
             print(result.answer)
             print()
 
@@ -145,7 +201,8 @@ def main() -> None:
                 print()
 
         except Exception as e:
-            print(f"\nError: {e}")
+            spinner.stop()
+            print(f"Error: {e}")
             print('Try again or type "quit" to exit.')
             print()
 

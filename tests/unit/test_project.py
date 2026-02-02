@@ -71,3 +71,35 @@ class TestProject:
         project.delete_document("old.txt")
 
         mock_storage.delete_document.assert_called_with("test-project", "old.txt")
+
+    def test_query_passes_on_progress_to_engine(
+        self, mock_storage: MagicMock, mock_registry: MagicMock
+    ):
+        """Query passes on_progress callback to RLM engine."""
+        from shesha.rlm.trace import StepType
+
+        # Mock the engine
+        mock_engine = MagicMock()
+        mock_engine.query.return_value = MagicMock(answer="test answer")
+
+        # Mock storage to return documents
+        mock_storage.list_documents.return_value = ["doc.txt"]
+        mock_storage.get_document.return_value = MagicMock(content="doc content")
+
+        project = Project(
+            project_id="test-project",
+            storage=mock_storage,
+            parser_registry=mock_registry,
+            rlm_engine=mock_engine,
+        )
+
+        # Create a callback
+        def on_progress(step_type: StepType, iteration: int, content: str) -> None:
+            pass
+
+        project.query("test question", on_progress=on_progress)
+
+        # Verify on_progress was passed to engine.query
+        mock_engine.query.assert_called_once()
+        call_kwargs = mock_engine.query.call_args.kwargs
+        assert call_kwargs.get("on_progress") is on_progress

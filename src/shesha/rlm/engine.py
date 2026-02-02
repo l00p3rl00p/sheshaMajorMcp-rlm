@@ -2,12 +2,16 @@
 
 import re
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from shesha.llm.client import LLMClient
 from shesha.rlm.prompts import build_subcall_prompt, build_system_prompt, wrap_repl_output
 from shesha.rlm.trace import StepType, TokenUsage, Trace
 from shesha.sandbox.executor import ContainerExecutor
+
+# Callback type for progress notifications
+ProgressCallback = Callable[[StepType, int, str], None]
 
 
 @dataclass
@@ -52,14 +56,18 @@ class RLMEngine:
         trace: Trace,
         token_usage: TokenUsage,
         iteration: int,
+        on_progress: ProgressCallback | None = None,
     ) -> str:
         """Handle a sub-LLM query from the sandbox."""
         # Record the request
+        step_content = f"instruction: {instruction}\ncontent: [{len(content)} chars]"
         trace.add_step(
             type=StepType.SUBCALL_REQUEST,
-            content=f"instruction: {instruction}\ncontent: [{len(content)} chars]",
+            content=step_content,
             iteration=iteration,
         )
+        if on_progress:
+            on_progress(StepType.SUBCALL_REQUEST, iteration, step_content)
 
         # Build prompt and call LLM
         prompt = build_subcall_prompt(instruction, content)
@@ -77,6 +85,8 @@ class RLMEngine:
             iteration=iteration,
             tokens_used=response.total_tokens,
         )
+        if on_progress:
+            on_progress(StepType.SUBCALL_RESPONSE, iteration, response.content)
 
         return response.content
 
@@ -85,6 +95,7 @@ class RLMEngine:
         documents: list[str],
         question: str,
         doc_names: list[str] | None = None,
+        on_progress: ProgressCallback | None = None,
     ) -> QueryResult:
         """Run an RLM query against documents."""
         start_time = time.time()
@@ -114,7 +125,7 @@ class RLMEngine:
         # Create executor with callback for llm_query
         def llm_query_callback(instruction: str, content: str) -> str:
             return self._handle_llm_query(
-                instruction, content, trace, token_usage, current_iteration
+                instruction, content, trace, token_usage, current_iteration, on_progress
             )
 
         executor = ContainerExecutor(llm_query_handler=llm_query_callback)
@@ -137,6 +148,8 @@ class RLMEngine:
                     iteration=iteration,
                     tokens_used=response.total_tokens,
                 )
+                if on_progress:
+                    on_progress(StepType.CODE_GENERATED, iteration, response.content)
 
                 # Extract code blocks
                 code_blocks = extract_code_blocks(response.content)
@@ -176,6 +189,8 @@ class RLMEngine:
                         iteration=iteration,
                         duration_ms=exec_duration,
                     )
+                    if on_progress:
+                        on_progress(StepType.CODE_OUTPUT, iteration, output)
 
                     all_output.append(output)
 
@@ -187,6 +202,8 @@ class RLMEngine:
                             content=final_answer,
                             iteration=iteration,
                         )
+                        if on_progress:
+                            on_progress(StepType.FINAL_ANSWER, iteration, final_answer)
                         break
 
                 if final_answer:

@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from shesha.parser.registry import ParserRegistry
-from shesha.rlm.engine import QueryResult, RLMEngine
+from shesha.rlm.engine import ProgressCallback, QueryResult, RLMEngine
 from shesha.storage.base import StorageBackend
 
 
@@ -53,7 +53,11 @@ class Project:
         """Delete a document from the project."""
         self._storage.delete_document(self.project_id, doc_name)
 
-    def query(self, question: str) -> QueryResult:
+    def query(
+        self,
+        question: str,
+        on_progress: ProgressCallback | None = None,
+    ) -> QueryResult:
         """Query the documents with a question."""
         if self._rlm_engine is None:
             raise RuntimeError("No RLM engine configured for queries")
@@ -63,4 +67,5 @@ class Project:
             documents=[d.content for d in docs],
             question=question,
             doc_names=[d.name for d in docs],
+            on_progress=on_progress,
         )

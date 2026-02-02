@@ -83,3 +83,54 @@ class TestRLMEngine:
 
         assert result.answer == "The answer is 42"
         assert len(result.trace.steps) > 0
+
+    @patch("shesha.rlm.engine.ContainerExecutor")
+    @patch("shesha.rlm.engine.LLMClient")
+    def test_engine_calls_on_progress_callback(
+        self,
+        mock_llm_cls: MagicMock,
+        mock_executor_cls: MagicMock,
+    ):
+        """Engine calls on_progress callback for each step."""
+        from shesha.rlm.trace import StepType
+
+        # Mock LLM to return code with FINAL
+        mock_llm = MagicMock()
+        mock_llm.complete.return_value = MagicMock(
+            content='```repl\nFINAL("Done")\n```',
+            prompt_tokens=100,
+            completion_tokens=50,
+            total_tokens=150,
+        )
+        mock_llm_cls.return_value = mock_llm
+
+        # Mock executor
+        mock_executor = MagicMock()
+        mock_executor.execute.return_value = MagicMock(
+            status="ok",
+            stdout="output",
+            stderr="",
+            error=None,
+            final_answer="Done",
+        )
+        mock_executor_cls.return_value = mock_executor
+
+        # Track callback invocations
+        progress_calls: list[tuple[StepType, int]] = []
+
+        def on_progress(step_type: StepType, iteration: int, content: str) -> None:
+            progress_calls.append((step_type, iteration))
+
+        engine = RLMEngine(model="test-model")
+        result = engine.query(
+            documents=["Doc content"],
+            question="Test?",
+            on_progress=on_progress,
+        )
+
+        assert result.answer == "Done"
+        # Should have at least CODE_GENERATED, CODE_OUTPUT, FINAL_ANSWER
+        step_types = [call[0] for call in progress_calls]
+        assert StepType.CODE_GENERATED in step_types
+        assert StepType.CODE_OUTPUT in step_types
+        assert StepType.FINAL_ANSWER in step_types
