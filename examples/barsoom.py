@@ -184,9 +184,10 @@ def main() -> None:
         setup_project(shesha)
 
     # Get the project
-    project = shesha.get_project(PROJECT_NAME)
-    if project is None:
-        print("Error: Failed to load barsoom project.")
+    try:
+        project = shesha.get_project(PROJECT_NAME)
+    except ValueError as e:
+        print(f"Error: {e}")
         sys.exit(1)
 
     # Non-interactive mode with --prompt
