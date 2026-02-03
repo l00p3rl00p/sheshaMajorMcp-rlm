@@ -2,8 +2,8 @@
 
 import sys
 
-from examples.barsoom import (
-    BOOKS,
+from examples.barsoom import BOOKS, parse_args
+from examples.script_utils import (
     HISTORY_WARN_CHARS,
     HISTORY_WARN_EXCHANGES,
     ThinkingSpinner,
@@ -12,7 +12,6 @@ from examples.barsoom import (
     format_stats,
     format_thought_time,
     is_exit_command,
-    parse_args,
     should_warn_history_size,
 )
 from shesha.rlm.trace import StepType, TokenUsage, Trace

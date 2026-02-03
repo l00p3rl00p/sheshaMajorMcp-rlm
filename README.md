@@ -206,6 +206,90 @@ python examples/barsoom.py --verbose
 python examples/barsoom.py --prompt "How does John Carter travel to Mars?"
 ```
 
+## Analyzing Codebases
+
+Shesha can ingest entire git repositories for deep code analysis with accurate file:line citations:
+
+```python
+from shesha import Shesha
+
+with Shesha() as s:
+    # Ingest a GitHub repository
+    result = s.create_project_from_repo(
+        url="https://github.com/org/repo",
+        token="ghp_xxxxx",  # Optional, for private repos
+    )
+
+    print(f"Status: {result.status}")
+    print(f"Files ingested: {result.files_ingested}")
+
+    # Query the codebase
+    answer = result.project.query("How does authentication work?")
+    print(answer.answer)  # Includes file:line citations
+
+    # Update when changes are available
+    if result.status == "updates_available":
+        result = result.apply_updates()
+```
+
+The codebase analyzer:
+- Supports GitHub, GitLab, Bitbucket, and local git repos
+- Uses shallow clones for efficiency
+- Tracks SHA for change detection
+- Formats code with line numbers for accurate citations
+- Handles various encodings via `chardet`
+- Detects language from file extensions and shebangs
+
+### Repository Explorer CLI
+
+For interactive codebase exploration, use the `repo.py` example script:
+
+```bash
+# Set your API key
+export SHESHA_API_KEY="your-api-key-here"
+
+# Optional: specify a model (defaults to claude-sonnet-4-20250514)
+export SHESHA_MODEL="gpt-4o"  # or gemini/gemini-1.5-pro, ollama/llama3, etc.
+
+# Explore a GitHub repository
+python examples/repo.py https://github.com/org/repo
+
+# Explore a local git repository
+python examples/repo.py /path/to/local/repo
+
+# Run without arguments to see a picker of previously indexed repos
+python examples/repo.py
+```
+
+The picker mode lets you select from previously indexed repositories or enter a new URL:
+
+```
+Available repositories:
+  1. org-repo
+  2. another-project
+
+Enter number or new repo URL: 1
+Loading project: org-repo
+
+Ask questions about the codebase. Type "quit" or "exit" to leave.
+
+> How does authentication work?
+[Thought for 15 seconds]
+Authentication is handled in src/auth/handler.py:42...
+```
+
+Command line options:
+
+| Flag | Description |
+|------|-------------|
+| `--update` | Auto-apply updates without prompting when changes are detected |
+| `--verbose` | Show execution stats (time, tokens, trace) after each answer |
+
+```bash
+# Auto-update and show stats
+python examples/repo.py https://github.com/org/repo --update --verbose
+```
+
 ## How It Works
 
 1. **Upload**: Documents are parsed and stored in a project

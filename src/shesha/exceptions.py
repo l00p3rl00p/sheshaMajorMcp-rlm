@@ -53,3 +53,32 @@ class NoParserError(SheshaError):
     def __init__(self, path: str) -> None:
         self.path = path
         super().__init__(f"No parser available for '{path}'")
+
+
+class RepoError(SheshaError):
+    """Base exception for repository-related errors."""
+
+
+class AuthenticationError(RepoError):
+    """Raised when repository authentication fails."""
+
+    def __init__(self, url: str) -> None:
+        self.url = url
+        super().__init__(
+            f"Authentication failed for '{url}'. "
+            "Pass `token=` parameter or set GITHUB_TOKEN/GITLAB_TOKEN/BITBUCKET_TOKEN "
+            "environment variable."
+        )
+
+
+class RepoIngestError(RepoError):
+    """Raised when repository ingestion fails."""
+
+    def __init__(self, url: str, cause: Exception | None = None) -> None:
+        self.url = url
+        msg = f"Failed to ingest repository '{url}'"
+        if cause:
+            msg += f": {cause}"
+        super().__init__(msg)
+        if cause:
+            self.__cause__ = cause

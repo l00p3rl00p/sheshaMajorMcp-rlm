@@ -1,0 +1,217 @@
+"""Git repository ingester."""
+
+import json
+import os
+import re
+import shutil
+import subprocess
+from pathlib import Path
+from urllib.parse import urlparse, urlunparse
+
+from shesha.exceptions import AuthenticationError, RepoIngestError
+
+
+class RepoIngester:
+    """Handles git repository cloning, updating, and file extraction."""
+
+    # Host to environment variable mapping
+    HOST_TO_ENV_VAR = {
+        "github.com": "GITHUB_TOKEN",
+        "gitlab.com": "GITLAB_TOKEN",
+        "bitbucket.org": "BITBUCKET_TOKEN",
+    }
+
+    def __init__(self, storage_path: Path | str) -> None:
+        """Initialize with storage path for cloned repos."""
+        self.storage_path = Path(storage_path)
+        self.repos_dir = self.storage_path / "repos"
+        self.repos_dir.mkdir(parents=True, exist_ok=True)
+
+    def is_local_path(self, url: str) -> bool:
+        """Check if url is a local filesystem path."""
+        return url.startswith("/") or url.startswith("~") or Path(url).exists()
+
+    def detect_host(self, url: str) -> str | None:
+        """Detect the git host from a URL."""
+        if self.is_local_path(url):
+            return None
+
+        # Handle SSH URLs (git@github.com:org/repo.git)
+        ssh_match = re.match(r"git@([^:]+):", url)
+        if ssh_match:
+            return ssh_match.group(1)
+
+        # Handle HTTPS URLs
+        parsed = urlparse(url)
+        if parsed.netloc:
+            return parsed.netloc
+
+        return None
+
+    def resolve_token(self, url: str, explicit_token: str | None) -> str | None:
+        """Resolve authentication token for a URL.
+
+        Priority: explicit token > env var > None (system git auth)
+        """
+        if explicit_token:
+            return explicit_token
+
+        host = self.detect_host(url)
+        if host and host in self.HOST_TO_ENV_VAR:
+            env_var = self.HOST_TO_ENV_VAR[host]
+            return os.environ.get(env_var)
+
+        return None
+
+    def clone(
+        self,
+        url: str,
+        project_id: str,
+        token: str | None = None,
+    ) -> Path:
+        """Clone a git repository."""
+        repo_path = self.repos_dir / project_id
+        repo_path.mkdir(parents=True, exist_ok=True)
+
+        clone_url = self._inject_token(url, token) if token else url
+
+        result = subprocess.run(
+            ["git", "clone", "--depth=1", clone_url, str(repo_path)],
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode != 0:
+            if repo_path.exists():
+                shutil.rmtree(repo_path)
+            if "Authentication failed" in result.stderr:
+                raise AuthenticationError(url)
+            raise RepoIngestError(url, RuntimeError(result.stderr))
+
+        return repo_path
+
+    def _inject_token(self, url: str, token: str) -> str:
+        """Inject auth token into HTTPS URL."""
+        parsed = urlparse(url)
+        if parsed.scheme in ("http", "https"):
+            netloc = f"{token}@{parsed.netloc}"
+            return urlunparse(parsed._replace(netloc=netloc))
+        return url
+
+    def save_sha(self, project_id: str, sha: str) -> None:
+        """Save the HEAD SHA for a project."""
+        repo_path = self.repos_dir / project_id
+        repo_path.mkdir(parents=True, exist_ok=True)
+        meta_path = repo_path / "_repo_meta.json"
+        meta_path.write_text(json.dumps({"head_sha": sha}))
+
+    def get_saved_sha(self, project_id: str) -> str | None:
+        """Get the saved HEAD SHA for a project."""
+        meta_path = self.repos_dir / project_id / "_repo_meta.json"
+        if not meta_path.exists():
+            return None
+        data = json.loads(meta_path.read_text())
+        sha = data.get("head_sha")
+        return str(sha) if sha is not None else None
+
+    def get_remote_sha(self, url: str, token: str | None = None) -> str | None:
+        """Get the HEAD SHA from remote repository."""
+        cmd = ["git", "ls-remote", url, "HEAD"]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        if result.returncode != 0:
+            return None
+
+        parts = result.stdout.strip().split()
+        return parts[0] if parts else None
+
+    def get_local_sha(self, project_id: str) -> str | None:
+        """Get the HEAD SHA from a local cloned repo."""
+        repo_path = self.repos_dir / project_id
+        return self.get_sha_from_path(repo_path)
+
+    def get_sha_from_path(self, repo_path: Path) -> str | None:
+        """Get the HEAD SHA from a repository at the given path."""
+        if not repo_path.exists():
+            return None
+
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode != 0:
+            return None
+
+        return result.stdout.strip()
+
+    def list_files(self, project_id: str, subdir: str | None = None) -> list[str]:
+        """List tracked files in a cloned repository.
+
+        Args:
+            project_id: ID of the cloned repo.
+            subdir: Optional subdirectory to filter to.
+
+        Returns:
+            List of relative file paths.
+        """
+        repo_path = self.repos_dir / project_id
+        return self.list_files_from_path(repo_path, subdir)
+
+    def list_files_from_path(self, repo_path: Path, subdir: str | None = None) -> list[str]:
+        """List tracked files in a repository at the given path.
+
+        Args:
+            repo_path: Path to the git repository.
+            subdir: Optional subdirectory to filter to.
+
+        Returns:
+            List of relative file paths.
+        """
+        cmd = ["git", "ls-files"]
+        if subdir:
+            cmd.append(subdir)
+
+        result = subprocess.run(
+            cmd,
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode != 0:
+            return []
+
+        files = result.stdout.strip().split("\n")
+        return [f for f in files if f]
+
+    def fetch(self, project_id: str) -> None:
+        """Fetch updates from remote."""
+        repo_path = self.repos_dir / project_id
+
+        subprocess.run(
+            ["git", "fetch", "origin"],
+            cwd=repo_path,
+            capture_output=True,
+        )
+
+    def pull(self, project_id: str) -> None:
+        """Pull updates from remote.
+
+        Raises:
+            RepoIngestError: If pull fails.
+        """
+        repo_path = self.repos_dir / project_id
+        url = f"repo at {repo_path}"
+
+        result = subprocess.run(
+            ["git", "pull", "--ff-only"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode != 0:
+            raise RepoIngestError(url, RuntimeError(result.stderr))

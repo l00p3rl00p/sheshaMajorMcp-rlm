@@ -1,0 +1,308 @@
+"""Tests for RepoIngester."""
+
+import json
+import os
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from shesha.exceptions import AuthenticationError, RepoIngestError
+from shesha.repo.ingester import RepoIngester
+
+
+@pytest.fixture
+def ingester(tmp_path: Path) -> RepoIngester:
+    return RepoIngester(storage_path=tmp_path)
+
+
+class TestRepoIngester:
+    """Tests for RepoIngester class."""
+
+    def test_init_creates_repos_dir(self, ingester: RepoIngester, tmp_path: Path):
+        """RepoIngester creates repos directory on init."""
+        assert (tmp_path / "repos").is_dir()
+
+    def test_is_local_path_absolute(self, ingester: RepoIngester):
+        """is_local_path returns True for absolute paths."""
+        assert ingester.is_local_path("/home/user/repo")
+
+    def test_is_local_path_home(self, ingester: RepoIngester):
+        """is_local_path returns True for home-relative paths."""
+        assert ingester.is_local_path("~/projects/repo")
+
+    def test_is_local_path_url(self, ingester: RepoIngester):
+        """is_local_path returns False for URLs."""
+        assert not ingester.is_local_path("https://github.com/org/repo")
+        assert not ingester.is_local_path("git@github.com:org/repo.git")
+
+    def test_detect_host_github(self, ingester: RepoIngester):
+        """detect_host identifies GitHub URLs."""
+        assert ingester.detect_host("https://github.com/org/repo") == "github.com"
+        assert ingester.detect_host("git@github.com:org/repo.git") == "github.com"
+
+    def test_detect_host_gitlab(self, ingester: RepoIngester):
+        """detect_host identifies GitLab URLs."""
+        assert ingester.detect_host("https://gitlab.com/org/repo") == "gitlab.com"
+
+    def test_detect_host_bitbucket(self, ingester: RepoIngester):
+        """detect_host identifies Bitbucket URLs."""
+        assert ingester.detect_host("https://bitbucket.org/org/repo") == "bitbucket.org"
+
+    def test_detect_host_local(self, ingester: RepoIngester):
+        """detect_host returns None for local paths."""
+        assert ingester.detect_host("/home/user/repo") is None
+
+
+class TestTokenResolution:
+    """Tests for token resolution logic."""
+
+    def test_explicit_token_takes_precedence(self, ingester: RepoIngester):
+        """Explicit token parameter wins over env vars."""
+        with patch.dict(os.environ, {"GITHUB_TOKEN": "env_token"}):
+            token = ingester.resolve_token(
+                url="https://github.com/org/repo",
+                explicit_token="explicit_token",
+            )
+            assert token == "explicit_token"
+
+    def test_github_env_token(self, ingester: RepoIngester):
+        """GITHUB_TOKEN env var used for github.com."""
+        with patch.dict(os.environ, {"GITHUB_TOKEN": "gh_token"}, clear=True):
+            token = ingester.resolve_token(
+                url="https://github.com/org/repo",
+                explicit_token=None,
+            )
+            assert token == "gh_token"
+
+    def test_gitlab_env_token(self, ingester: RepoIngester):
+        """GITLAB_TOKEN env var used for gitlab.com."""
+        with patch.dict(os.environ, {"GITLAB_TOKEN": "gl_token"}, clear=True):
+            token = ingester.resolve_token(
+                url="https://gitlab.com/org/repo",
+                explicit_token=None,
+            )
+            assert token == "gl_token"
+
+    def test_no_token_returns_none(self, ingester: RepoIngester):
+        """Returns None when no token available."""
+        with patch.dict(os.environ, {}, clear=True):
+            token = ingester.resolve_token(
+                url="https://github.com/org/repo",
+                explicit_token=None,
+            )
+            assert token is None
+
+
+class TestGitClone:
+    """Tests for git clone functionality."""
+
+    def test_clone_creates_project_dir(self, ingester: RepoIngester, tmp_path: Path):
+        """clone() creates directory for the project."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stderr="")
+
+            ingester.clone(
+                url="https://github.com/org/repo",
+                project_id="my-project",
+            )
+
+            assert (tmp_path / "repos" / "my-project").is_dir()
+
+    def test_clone_uses_depth_1(self, ingester: RepoIngester):
+        """clone() uses shallow clone (depth=1)."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stderr="")
+
+            ingester.clone(
+                url="https://github.com/org/repo",
+                project_id="my-project",
+            )
+
+            call_args = mock_run.call_args[0][0]
+            assert "--depth=1" in call_args
+
+    def test_clone_injects_token_into_url(self, ingester: RepoIngester):
+        """clone() injects token into HTTPS URL."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stderr="")
+
+            ingester.clone(
+                url="https://github.com/org/repo",
+                project_id="my-project",
+                token="my_token",
+            )
+
+            call_args = mock_run.call_args[0][0]
+            url_in_cmd = [a for a in call_args if "github.com" in a][0]
+            assert "my_token@github.com" in url_in_cmd
+
+    def test_clone_auth_failure_raises(self, ingester: RepoIngester):
+        """clone() raises AuthenticationError on auth failure."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=128,
+                stderr="fatal: Authentication failed",
+            )
+
+            with pytest.raises(AuthenticationError):
+                ingester.clone(
+                    url="https://github.com/org/private-repo",
+                    project_id="my-project",
+                )
+
+    def test_clone_other_failure_raises(self, ingester: RepoIngester):
+        """clone() raises RepoIngestError on other failures."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=128,
+                stderr="fatal: repository not found",
+            )
+
+            with pytest.raises(RepoIngestError):
+                ingester.clone(
+                    url="https://github.com/org/nonexistent",
+                    project_id="my-project",
+                )
+
+
+class TestSHATracking:
+    """Tests for SHA tracking functionality."""
+
+    def test_save_sha_creates_file(self, ingester: RepoIngester, tmp_path: Path):
+        """save_sha() creates metadata file with SHA."""
+        ingester.save_sha("my-project", "abc123def456")
+
+        meta_path = tmp_path / "repos" / "my-project" / "_repo_meta.json"
+        assert meta_path.exists()
+        data = json.loads(meta_path.read_text())
+        assert data["head_sha"] == "abc123def456"
+
+    def test_get_saved_sha(self, ingester: RepoIngester, tmp_path: Path):
+        """get_saved_sha() returns stored SHA."""
+        (tmp_path / "repos" / "my-project").mkdir(parents=True)
+        meta_path = tmp_path / "repos" / "my-project" / "_repo_meta.json"
+        meta_path.write_text(json.dumps({"head_sha": "abc123"}))
+
+        sha = ingester.get_saved_sha("my-project")
+        assert sha == "abc123"
+
+    def test_get_saved_sha_missing_returns_none(self, ingester: RepoIngester):
+        """get_saved_sha() returns None if no metadata."""
+        sha = ingester.get_saved_sha("nonexistent-project")
+        assert sha is None
+
+    def test_get_remote_sha(self, ingester: RepoIngester):
+        """get_remote_sha() calls git ls-remote."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0,
+                stdout="abc123def456789\tHEAD\n",
+            )
+
+            sha = ingester.get_remote_sha("https://github.com/org/repo")
+            assert sha == "abc123def456789"
+            assert "ls-remote" in mock_run.call_args[0][0]
+
+    def test_get_local_sha(self, ingester: RepoIngester, tmp_path: Path):
+        """get_local_sha() returns HEAD SHA from local repo."""
+        repo_path = tmp_path / "repos" / "my-project"
+        repo_path.mkdir(parents=True)
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0,
+                stdout="abc123def456789\n",
+            )
+
+            sha = ingester.get_local_sha("my-project")
+            assert sha == "abc123def456789"
+
+
+class TestFileListing:
+    """Tests for file listing functionality."""
+
+    def test_list_files_uses_git_ls_files(self, ingester: RepoIngester, tmp_path: Path):
+        """list_files() uses git ls-files."""
+        repo_path = tmp_path / "repos" / "my-project"
+        repo_path.mkdir(parents=True)
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0,
+                stdout="src/main.py\nREADME.md\ntests/test_main.py\n",
+            )
+
+            files = ingester.list_files("my-project")
+            assert files == ["src/main.py", "README.md", "tests/test_main.py"]
+
+    def test_list_files_with_subdirectory(self, ingester: RepoIngester, tmp_path: Path):
+        """list_files() filters to subdirectory when specified."""
+        repo_path = tmp_path / "repos" / "my-project"
+        repo_path.mkdir(parents=True)
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0,
+                stdout="src/main.py\nsrc/utils.py\n",
+            )
+
+            ingester.list_files("my-project", subdir="src/")
+
+            call_args = mock_run.call_args[0][0]
+            assert "src/" in call_args
+
+    def test_list_files_empty_repo(self, ingester: RepoIngester, tmp_path: Path):
+        """list_files() returns empty list for empty repo."""
+        repo_path = tmp_path / "repos" / "my-project"
+        repo_path.mkdir(parents=True)
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="")
+
+            files = ingester.list_files("my-project")
+            assert files == []
+
+
+class TestGitFetchPull:
+    """Tests for git fetch and pull functionality."""
+
+    def test_fetch_calls_git_fetch(self, ingester: RepoIngester, tmp_path: Path):
+        """fetch() calls git fetch."""
+        repo_path = tmp_path / "repos" / "my-project"
+        repo_path.mkdir(parents=True)
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+
+            ingester.fetch("my-project")
+
+            call_args = mock_run.call_args[0][0]
+            assert "fetch" in call_args
+
+    def test_pull_calls_git_pull(self, ingester: RepoIngester, tmp_path: Path):
+        """pull() calls git pull."""
+        repo_path = tmp_path / "repos" / "my-project"
+        repo_path.mkdir(parents=True)
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+
+            ingester.pull("my-project")
+
+            call_args = mock_run.call_args[0][0]
+            assert "pull" in call_args
+
+    def test_pull_failure_raises(self, ingester: RepoIngester, tmp_path: Path):
+        """pull() raises RepoIngestError on failure."""
+        repo_path = tmp_path / "repos" / "my-project"
+        repo_path.mkdir(parents=True)
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=1,
+                stderr="merge conflict",
+            )
+
+            with pytest.raises(RepoIngestError):
+                ingester.pull("my-project")
