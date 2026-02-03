@@ -206,6 +206,40 @@ python examples/barsoom.py --verbose
 python examples/barsoom.py --prompt "How does John Carter travel to Mars?"
 ```
 
+## Analyzing Codebases
+
+Shesha can ingest entire git repositories for deep code analysis with accurate file:line citations:
+
+```python
+from shesha import Shesha
+
+with Shesha() as s:
+    # Ingest a GitHub repository
+    result = s.create_project_from_repo(
+        url="https://github.com/org/repo",
+        token="ghp_xxxxx",  # Optional, for private repos
+    )
+
+    print(f"Status: {result.status}")
+    print(f"Files ingested: {result.files_ingested}")
+
+    # Query the codebase
+    answer = result.project.query("How does authentication work?")
+    print(answer.answer)  # Includes file:line citations
+
+    # Update when changes are available
+    if result.status == "updates_available":
+        result = result.apply_updates()
+```
+
+The codebase analyzer:
+- Supports GitHub, GitLab, Bitbucket, and local git repos
+- Uses shallow clones for efficiency
+- Tracks SHA for change detection
+- Formats code with line numbers for accurate citations
+- Handles various encodings via `chardet`
+- Detects language from file extensions and shebangs
+
 ## How It Works
 
 1. **Upload**: Documents are parsed and stored in a project
