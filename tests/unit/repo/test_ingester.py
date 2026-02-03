@@ -247,7 +247,7 @@ class TestFileListing:
                 stdout="src/main.py\nsrc/utils.py\n",
             )
 
-            files = ingester.list_files("my-project", subdir="src/")
+            ingester.list_files("my-project", subdir="src/")
 
             call_args = mock_run.call_args[0][0]
             assert "src/" in call_args

@@ -92,9 +92,9 @@ class TestCreateProjectFromRepo:
     def test_creates_new_project(self, tmp_path: Path):
         """create_project_from_repo creates project for new repo."""
         with patch("shesha.shesha.ContainerPool"):
-            with patch("shesha.shesha.RepoIngester") as MockIngester:
+            with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
                 mock_ingester = MagicMock()
-                MockIngester.return_value = mock_ingester
+                mock_ingester_cls.return_value = mock_ingester
 
                 mock_ingester.is_local_path.return_value = True
                 mock_ingester.get_saved_sha.return_value = None
@@ -128,9 +128,9 @@ class TestCreateProjectFromRepo:
     def test_unchanged_when_sha_matches(self, tmp_path: Path):
         """create_project_from_repo returns unchanged when SHAs match."""
         with patch("shesha.shesha.ContainerPool"):
-            with patch("shesha.shesha.RepoIngester") as MockIngester:
+            with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
                 mock_ingester = MagicMock()
-                MockIngester.return_value = mock_ingester
+                mock_ingester_cls.return_value = mock_ingester
 
                 mock_ingester.is_local_path.return_value = False
                 mock_ingester.get_saved_sha.return_value = "abc123"
@@ -149,9 +149,9 @@ class TestCreateProjectFromRepo:
     def test_updates_available_when_sha_differs(self, tmp_path: Path):
         """create_project_from_repo returns updates_available when SHAs differ."""
         with patch("shesha.shesha.ContainerPool"):
-            with patch("shesha.shesha.RepoIngester") as MockIngester:
+            with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
                 mock_ingester = MagicMock()
-                MockIngester.return_value = mock_ingester
+                mock_ingester_cls.return_value = mock_ingester
 
                 mock_ingester.is_local_path.return_value = False
                 mock_ingester.get_saved_sha.return_value = "abc123"
