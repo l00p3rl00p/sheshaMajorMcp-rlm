@@ -51,3 +51,34 @@ class TestCodeParser:
         assert "function hello" in doc.content
         assert doc.format == "js"
         assert doc.metadata["language"] == "javascript"
+
+    def test_parse_with_line_numbers(self, parser: CodeParser, fixtures_dir: Path):
+        """CodeParser formats with line numbers when enabled."""
+        doc = parser.parse(
+            fixtures_dir / "sample.py",
+            include_line_numbers=True,
+            file_path="src/sample.py",
+        )
+
+        # Should have file header
+        assert "=== FILE: src/sample.py ===" in doc.content
+
+        # Should have line numbers
+        lines = doc.content.split("\n")
+        # First line is header, second is content
+        assert lines[1].strip().startswith("1|")
+
+    def test_line_number_padding_adjusts(self, parser: CodeParser, tmp_path: Path):
+        """Line number padding adjusts to file length."""
+        # Create a file with 100+ lines
+        content = "\n".join([f"line {i}" for i in range(150)])
+        test_file = tmp_path / "many_lines.py"
+        test_file.write_text(content)
+
+        doc = parser.parse(test_file, include_line_numbers=True, file_path="many_lines.py")
+        lines = doc.content.split("\n")
+
+        # Line 1 should be padded to 3 digits (for 150 lines)
+        assert "  1|" in lines[1]
+        # Line 100 should be padded to 3 digits
+        assert "100|" in lines[100]
