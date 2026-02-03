@@ -262,3 +262,47 @@ class TestFileListing:
 
             files = ingester.list_files("my-project")
             assert files == []
+
+
+class TestGitFetchPull:
+    """Tests for git fetch and pull functionality."""
+
+    def test_fetch_calls_git_fetch(self, ingester: RepoIngester, tmp_path: Path):
+        """fetch() calls git fetch."""
+        repo_path = tmp_path / "repos" / "my-project"
+        repo_path.mkdir(parents=True)
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+
+            ingester.fetch("my-project")
+
+            call_args = mock_run.call_args[0][0]
+            assert "fetch" in call_args
+
+    def test_pull_calls_git_pull(self, ingester: RepoIngester, tmp_path: Path):
+        """pull() calls git pull."""
+        repo_path = tmp_path / "repos" / "my-project"
+        repo_path.mkdir(parents=True)
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+
+            ingester.pull("my-project")
+
+            call_args = mock_run.call_args[0][0]
+            assert "pull" in call_args
+
+    def test_pull_failure_raises(self, ingester: RepoIngester, tmp_path: Path):
+        """pull() raises RepoIngestError on failure."""
+        repo_path = tmp_path / "repos" / "my-project"
+        repo_path.mkdir(parents=True)
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=1,
+                stderr="merge conflict",
+            )
+
+            with pytest.raises(RepoIngestError):
+                ingester.pull("my-project")

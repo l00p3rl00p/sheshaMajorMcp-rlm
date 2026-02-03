@@ -171,3 +171,32 @@ class RepoIngester:
 
         files = result.stdout.strip().split("\n")
         return [f for f in files if f]
+
+    def fetch(self, project_id: str) -> None:
+        """Fetch updates from remote."""
+        repo_path = self.repos_dir / project_id
+
+        subprocess.run(
+            ["git", "fetch", "origin"],
+            cwd=repo_path,
+            capture_output=True,
+        )
+
+    def pull(self, project_id: str) -> None:
+        """Pull updates from remote.
+
+        Raises:
+            RepoIngestError: If pull fails.
+        """
+        repo_path = self.repos_dir / project_id
+        url = f"repo at {repo_path}"
+
+        result = subprocess.run(
+            ["git", "pull", "--ff-only"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode != 0:
+            raise RepoIngestError(url, RuntimeError(result.stderr))
