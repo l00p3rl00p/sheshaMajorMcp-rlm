@@ -255,6 +255,32 @@ class TestRunInteractiveLoop:
 class TestMain:
     """Tests for main function."""
 
+    def test_docker_not_running_exits_cleanly(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Docker not running should print clean error and exit."""
+        import os
+        import sys
+
+        from examples.repo import main
+
+        with patch.object(sys, "argv", ["repo.py", "https://github.com/test/repo"]):
+            with patch.dict(os.environ, {"SHESHA_API_KEY": "test-key"}, clear=True):
+                with patch("examples.repo.SheshaConfig"):
+                    with patch(
+                        "examples.repo.Shesha",
+                        side_effect=RuntimeError(
+                            "Docker is not running. Please start Docker Desktop and try again."
+                        ),
+                    ):
+                        with pytest.raises(SystemExit) as exc_info:
+                            main()
+
+        assert exc_info.value.code == 1
+        captured = capsys.readouterr()
+        assert "Docker" in captured.out
+        assert "not running" in captured.out
+        # Should NOT have traceback
+        assert "Traceback" not in captured.out
+
     def test_no_api_key_exits(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Missing API key should print error and exit."""
         import os

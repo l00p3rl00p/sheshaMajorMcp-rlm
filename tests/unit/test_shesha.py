@@ -3,8 +3,35 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from shesha import Shesha
 from shesha.models import RepoProjectResult
+
+
+class TestDockerAvailability:
+    """Tests for Docker availability check at startup."""
+
+    def test_raises_clear_error_when_docker_not_running(self, tmp_path: Path):
+        """Shesha raises clear error at init when Docker is not running.
+
+        Users should get a helpful error message immediately at startup,
+        not when they first try to run a query.
+        """
+        from docker.errors import DockerException
+
+        with patch("shesha.shesha.docker") as mock_docker:
+            mock_docker.from_env.side_effect = DockerException(
+                "Error while fetching server API version: "
+                "('Connection aborted.', ConnectionRefusedError(61, 'Connection refused'))"
+            )
+
+            with pytest.raises(RuntimeError) as exc_info:
+                Shesha(model="test-model", storage_path=tmp_path)
+
+            error_msg = str(exc_info.value)
+            assert "Docker" in error_msg
+            assert "not running" in error_msg or "start" in error_msg.lower()
 
 
 class TestShesha:
@@ -12,7 +39,7 @@ class TestShesha:
 
     def test_create_project(self, tmp_path: Path):
         """Creating a project returns a Project instance."""
-        with patch("shesha.shesha.ContainerPool"):
+        with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
             shesha = Shesha(
                 model="test-model",
                 storage_path=tmp_path,
@@ -23,7 +50,7 @@ class TestShesha:
 
     def test_list_projects(self, tmp_path: Path):
         """List projects returns project IDs."""
-        with patch("shesha.shesha.ContainerPool"):
+        with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
             shesha = Shesha(model="test-model", storage_path=tmp_path)
             shesha.create_project("project-a")
             shesha.create_project("project-b")
@@ -34,7 +61,7 @@ class TestShesha:
 
     def test_get_project(self, tmp_path: Path):
         """Get project returns existing project."""
-        with patch("shesha.shesha.ContainerPool"):
+        with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
             shesha = Shesha(model="test-model", storage_path=tmp_path)
             shesha.create_project("existing")
 
@@ -43,7 +70,7 @@ class TestShesha:
 
     def test_delete_project(self, tmp_path: Path):
         """Delete project removes it."""
-        with patch("shesha.shesha.ContainerPool"):
+        with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
             shesha = Shesha(model="test-model", storage_path=tmp_path)
             shesha.create_project("to-delete")
             shesha.delete_project("to-delete")
@@ -52,7 +79,7 @@ class TestShesha:
 
     def test_register_parser(self, tmp_path: Path):
         """Register custom parser adds it to the registry."""
-        with patch("shesha.shesha.ContainerPool"):
+        with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
             shesha = Shesha(model="test-model", storage_path=tmp_path)
 
             # Create a mock custom parser
@@ -67,7 +94,7 @@ class TestShesha:
     def test_stop_after_restart_stops_pool(self, tmp_path: Path):
         """Stop after start-stop-start cycle should stop the pool."""
         mock_pool = MagicMock()
-        with patch("shesha.shesha.ContainerPool", return_value=mock_pool):
+        with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool", return_value=mock_pool):
             shesha = Shesha(model="test-model", storage_path=tmp_path)
 
             # First cycle: start then stop
@@ -91,7 +118,7 @@ class TestCreateProjectFromRepo:
 
     def test_creates_new_project(self, tmp_path: Path):
         """create_project_from_repo creates project for new repo."""
-        with patch("shesha.shesha.ContainerPool"):
+        with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
             with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
                 mock_ingester = MagicMock()
                 mock_ingester_cls.return_value = mock_ingester
@@ -127,7 +154,7 @@ class TestCreateProjectFromRepo:
 
     def test_unchanged_when_sha_matches(self, tmp_path: Path):
         """create_project_from_repo returns unchanged when SHAs match."""
-        with patch("shesha.shesha.ContainerPool"):
+        with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
             with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
                 mock_ingester = MagicMock()
                 mock_ingester_cls.return_value = mock_ingester
@@ -148,7 +175,7 @@ class TestCreateProjectFromRepo:
 
     def test_updates_available_when_sha_differs(self, tmp_path: Path):
         """create_project_from_repo returns updates_available when SHAs differ."""
-        with patch("shesha.shesha.ContainerPool"):
+        with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
             with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
                 mock_ingester = MagicMock()
                 mock_ingester_cls.return_value = mock_ingester
@@ -169,7 +196,7 @@ class TestCreateProjectFromRepo:
 
     def test_apply_updates_skips_pull_for_local_repos(self, tmp_path: Path):
         """apply_updates() should not call pull() for local repositories."""
-        with patch("shesha.shesha.ContainerPool"):
+        with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
             with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
                 mock_ingester = MagicMock()
                 mock_ingester_cls.return_value = mock_ingester

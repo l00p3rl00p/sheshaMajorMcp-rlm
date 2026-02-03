@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import docker
+from docker.errors import DockerException
 from docker.models.containers import Container
 
 
@@ -51,7 +52,14 @@ class ContainerExecutor:
         """Start a container for execution."""
         self._raw_buffer = b""  # Clear raw stream buffer
         self._content_buffer = b""  # Clear content buffer
-        self._client = docker.from_env()
+        try:
+            self._client = docker.from_env()
+        except DockerException as e:
+            if "Connection refused" in str(e):
+                raise RuntimeError(
+                    "Docker is not running. Please start Docker Desktop and try again."
+                ) from e
+            raise
         self._container = self._client.containers.run(
             self.image,
             detach=True,

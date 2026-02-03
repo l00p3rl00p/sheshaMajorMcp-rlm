@@ -6,6 +6,9 @@ import weakref
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import docker
+from docker.errors import DockerException
+
 from shesha.config import SheshaConfig
 from shesha.models import ParsedDocument, RepoProjectResult
 from shesha.parser import create_default_registry
@@ -31,6 +34,9 @@ class Shesha:
         config: SheshaConfig | None = None,
     ) -> None:
         """Initialize Shesha."""
+        # Verify Docker is available before proceeding
+        self._check_docker_available()
+
         # Use provided config or create from args
         if config is None:
             config = SheshaConfig()
@@ -81,6 +87,19 @@ class Shesha:
                 obj.stop()
 
         atexit.register(_cleanup)
+
+    @staticmethod
+    def _check_docker_available() -> None:
+        """Verify Docker daemon is running. Raises RuntimeError if not."""
+        try:
+            client = docker.from_env()
+            client.close()
+        except DockerException as e:
+            if "Connection refused" in str(e):
+                raise RuntimeError(
+                    "Docker is not running. Please start Docker Desktop and try again."
+                ) from e
+            raise
 
     def create_project(self, project_id: str) -> Project:
         """Create a new project."""

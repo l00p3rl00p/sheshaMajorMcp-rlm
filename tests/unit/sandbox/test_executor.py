@@ -319,3 +319,30 @@ class TestContainerExecutor:
 
         # DockerClient.close() must be called to prevent urllib3 errors on exit
         mock_client.close.assert_called_once()
+
+    @patch("shesha.sandbox.executor.docker")
+    def test_start_raises_clear_error_when_docker_not_running(self, mock_docker: MagicMock):
+        """Executor provides clear error message when Docker daemon is not running.
+
+        When docker.from_env() fails with ConnectionRefusedError (wrapped in
+        docker.errors.DockerException), the error message should clearly explain
+        that Docker Desktop needs to be started.
+        """
+        from docker.errors import DockerException
+
+        # Simulate Docker daemon not running
+        mock_docker.from_env.side_effect = DockerException(
+            "Error while fetching server API version: "
+            "('Connection aborted.', ConnectionRefusedError(61, 'Connection refused'))"
+        )
+
+        executor = ContainerExecutor()
+
+        import pytest
+
+        with pytest.raises(RuntimeError) as exc_info:
+            executor.start()
+
+        error_msg = str(exc_info.value)
+        assert "Docker" in error_msg
+        assert "not running" in error_msg or "start" in error_msg.lower()

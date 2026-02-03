@@ -41,9 +41,8 @@ else:
     )
 
 if TYPE_CHECKING:
-    from shesha.project import Project
-
     from shesha.models import RepoProjectResult
+    from shesha.project import Project
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -209,7 +208,16 @@ def main() -> None:
         sys.exit(1)
 
     config = SheshaConfig.load(storage_path=STORAGE_PATH)
-    shesha = Shesha(config=config)
+    try:
+        shesha = Shesha(config=config)
+    except RuntimeError as e:
+        if "Docker" in str(e):
+            print(f"Error: {e}")
+            print()
+            print("To build the sandbox container, run:")
+            print("  docker build -t shesha-sandbox sandbox/")
+            sys.exit(1)
+        raise
 
     # Determine which repo to use
     project = None
