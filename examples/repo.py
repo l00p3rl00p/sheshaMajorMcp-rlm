@@ -43,7 +43,6 @@ else:
 if TYPE_CHECKING:
     from shesha.storage.project import Project
 
-    from shesha import Shesha
     from shesha.models import RepoProjectResult
 
 
