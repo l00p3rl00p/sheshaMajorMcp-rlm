@@ -1,6 +1,22 @@
 # GitHub Copilot Instructions
 
-Use these guidelines when generating code or documentation for Shesha.
+Use these guidelines when reviewing code for Shesha.
+
+## Code Review Guidelines
+
+**Verify before commenting:**
+- Read the actual code before claiming it does something wrong.
+- If citing a bug, quote the exact line - don't paraphrase.
+- Check that the scenario you're warning about can actually occur.
+
+**Match project conventions:**
+- Check how similar code is handled elsewhere before suggesting changes.
+- Don't apply generic "best practices" that conflict with existing patterns, unless those patterns are clearly wrong (security issues, bugs, deprecated APIs).
+- Consistency with the codebase trumps theoretical ideals.
+
+**Avoid hypotheticals:**
+- Focus on real inputs and actual usage, not invented edge cases.
+- If a scenario requires unlikely conditions, it's probably not worth flagging.
 
 ## Project Conventions
 
