@@ -197,7 +197,8 @@ class Shesha:
             )
 
         def apply_updates() -> RepoProjectResult:
-            self._repo_ingester.pull(name)
+            if not self._repo_ingester.is_local_path(url):
+                self._repo_ingester.pull(name)
             return self._ingest_repo(url, name, token, path, is_update=True)
 
         return RepoProjectResult(

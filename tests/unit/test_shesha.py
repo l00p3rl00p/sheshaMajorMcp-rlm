@@ -166,3 +166,34 @@ class TestCreateProjectFromRepo:
                 )
 
                 assert result.status == "updates_available"
+
+    def test_apply_updates_skips_pull_for_local_repos(self, tmp_path: Path):
+        """apply_updates() should not call pull() for local repositories."""
+        with patch("shesha.shesha.ContainerPool"):
+            with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
+                mock_ingester = MagicMock()
+                mock_ingester_cls.return_value = mock_ingester
+
+                # Simulate a local repo with updates available
+                mock_ingester.is_local_path.return_value = True
+                mock_ingester.get_saved_sha.return_value = "abc123"
+                mock_ingester.get_sha_from_path.return_value = "def456"  # Different SHA
+                mock_ingester.list_files_from_path.return_value = []
+                mock_ingester.repos_dir = tmp_path / "repos"
+
+                shesha = Shesha(model="test-model", storage_path=tmp_path)
+                shesha._storage.create_project("local-project")
+
+                result = shesha.create_project_from_repo(
+                    url="/path/to/local/repo",
+                    name="local-project",
+                )
+
+                assert result.status == "updates_available"
+
+                # Apply updates
+                mock_ingester.pull.reset_mock()
+                result.apply_updates()
+
+                # pull() should NOT be called for local repos
+                mock_ingester.pull.assert_not_called()
