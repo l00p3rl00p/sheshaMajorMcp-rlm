@@ -174,9 +174,7 @@ class TestTraceOperations:
         assert traces_dir.exists()
         assert traces_dir.name == "traces"
 
-    def test_get_traces_dir_nonexistent_project_raises(
-        self, storage: FilesystemStorage
-    ) -> None:
+    def test_get_traces_dir_nonexistent_project_raises(self, storage: FilesystemStorage) -> None:
         """get_traces_dir raises for nonexistent project."""
         with pytest.raises(ProjectNotFoundError):
             storage.get_traces_dir("no-such-project")
@@ -186,9 +184,7 @@ class TestTraceOperations:
         storage.create_project("empty-traces")
         assert storage.list_traces("empty-traces") == []
 
-    def test_list_traces_returns_sorted_by_name(
-        self, storage: FilesystemStorage
-    ) -> None:
+    def test_list_traces_returns_sorted_by_name(self, storage: FilesystemStorage) -> None:
         """list_traces returns files sorted by name (oldest first)."""
         storage.create_project("sorted-traces")
         traces_dir = storage.get_traces_dir("sorted-traces")
