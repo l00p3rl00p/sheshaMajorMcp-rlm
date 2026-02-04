@@ -2,11 +2,14 @@
 
 import datetime
 import json
+import logging
 from pathlib import Path
 
 from shesha.models import QueryContext
 from shesha.rlm.trace import TokenUsage, Trace
 from shesha.storage.filesystem import FilesystemStorage
+
+logger = logging.getLogger(__name__)
 
 
 class TraceWriter:
@@ -25,7 +28,7 @@ class TraceWriter:
         token_usage: TokenUsage,
         execution_time: float,
         status: str,
-    ) -> Path:
+    ) -> Path | None:
         """Write a trace to a JSONL file.
 
         Args:
@@ -38,67 +41,75 @@ class TraceWriter:
             status: Query status (success, max_iterations, error)
 
         Returns:
-            Path to the created trace file
+            Path to the created trace file, or None if write failed
         """
-        traces_dir = self.storage.get_traces_dir(project_id)
+        try:
+            # Apply redaction
+            redacted_trace = trace.redacted()
 
-        # Generate filename: YYYY-MM-DDTHH-MM-SS-mmm_shortid.jsonl
-        now = datetime.datetime.now(datetime.UTC)
-        timestamp = now.strftime("%Y-%m-%dT%H-%M-%S") + f"-{now.microsecond // 1000:03d}"
-        short_id = context.trace_id[:8]
-        filename = f"{timestamp}_{short_id}.jsonl"
+            traces_dir = self.storage.get_traces_dir(project_id)
 
-        # Build lines
-        lines: list[str] = []
+            # Generate filename: YYYY-MM-DDTHH-MM-SS-mmm_shortid.jsonl
+            now = datetime.datetime.now(datetime.UTC)
+            timestamp = now.strftime("%Y-%m-%dT%H-%M-%S") + f"-{now.microsecond // 1000:03d}"
+            short_id = context.trace_id[:8]
+            filename = f"{timestamp}_{short_id}.jsonl"
 
-        # Header
-        header = {
-            "type": "header",
-            "trace_id": context.trace_id,
-            "timestamp": now.isoformat(),
-            "question": context.question,
-            "document_ids": context.document_ids,
-            "model": context.model,
-            "system_prompt": context.system_prompt,
-            "subcall_prompt": context.subcall_prompt,
-        }
-        lines.append(json.dumps(header))
+            # Build lines
+            lines: list[str] = []
 
-        # Steps
-        for step in trace.steps:
-            step_data = {
-                "type": "step",
-                "step_type": step.type.value,
-                "iteration": step.iteration,
-                "timestamp": datetime.datetime.fromtimestamp(
-                    step.timestamp, tz=datetime.UTC
-                ).isoformat(),
-                "content": step.content,
-                "tokens_used": step.tokens_used,
-                "duration_ms": step.duration_ms,
+            # Header
+            header = {
+                "type": "header",
+                "trace_id": context.trace_id,
+                "timestamp": now.isoformat(),
+                "question": context.question,
+                "document_ids": context.document_ids,
+                "model": context.model,
+                "system_prompt": context.system_prompt,
+                "subcall_prompt": context.subcall_prompt,
             }
-            lines.append(json.dumps(step_data))
+            lines.append(json.dumps(header))
 
-        # Summary
-        max_iteration = max((s.iteration for s in trace.steps), default=0)
-        summary = {
-            "type": "summary",
-            "answer": answer,
-            "total_iterations": max_iteration + 1,
-            "total_tokens": {
-                "prompt": token_usage.prompt_tokens,
-                "completion": token_usage.completion_tokens,
-            },
-            "total_duration_ms": int(execution_time * 1000),
-            "status": status,
-        }
-        lines.append(json.dumps(summary))
+            # Steps (use redacted trace)
+            for step in redacted_trace.steps:
+                step_data = {
+                    "type": "step",
+                    "step_type": step.type.value,
+                    "iteration": step.iteration,
+                    "timestamp": datetime.datetime.fromtimestamp(
+                        step.timestamp, tz=datetime.UTC
+                    ).isoformat(),
+                    "content": step.content,
+                    "tokens_used": step.tokens_used,
+                    "duration_ms": step.duration_ms,
+                }
+                lines.append(json.dumps(step_data))
 
-        # Write file
-        path = traces_dir / filename
-        path.write_text("\n".join(lines) + "\n")
+            # Summary
+            max_iteration = max((s.iteration for s in redacted_trace.steps), default=0)
+            summary = {
+                "type": "summary",
+                "answer": answer,
+                "total_iterations": max_iteration + 1,
+                "total_tokens": {
+                    "prompt": token_usage.prompt_tokens,
+                    "completion": token_usage.completion_tokens,
+                },
+                "total_duration_ms": int(execution_time * 1000),
+                "status": status,
+            }
+            lines.append(json.dumps(summary))
 
-        return path
+            # Write file
+            path = traces_dir / filename
+            path.write_text("\n".join(lines) + "\n")
+
+            return path
+
+        except Exception as e:
+            logger.warning(f"Failed to write trace for project {project_id}: {e}")
+            return None
 
     def cleanup_old_traces(self, project_id: str, max_count: int = 50) -> None:
         """Remove oldest traces if count exceeds max_count.

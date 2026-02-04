@@ -258,3 +258,85 @@ class TestTraceWriterCleanup:
 
         remaining = storage.list_traces("test-project")
         assert len(remaining) == 2
+
+
+class TestTraceWriterSafety:
+    """Tests for error handling and redaction."""
+
+    @pytest.fixture
+    def storage(self, tmp_path: Path) -> FilesystemStorage:
+        """Create a temporary storage backend."""
+        storage = FilesystemStorage(root_path=tmp_path)
+        storage.create_project("test-project")
+        return storage
+
+    @pytest.fixture
+    def context(self) -> QueryContext:
+        """Create a sample query context."""
+        return QueryContext(
+            trace_id="abcd1234-5678-90ab-cdef-1234567890ab",
+            question="What is the answer?",
+            document_ids=["doc1"],
+            model="claude-sonnet-4-20250514",
+            system_prompt="System prompt",
+            subcall_prompt="Subcall prompt",
+        )
+
+    def test_traces_are_redacted_before_writing(
+        self, storage: FilesystemStorage, context: QueryContext
+    ) -> None:
+        """Secrets in trace content are redacted before writing."""
+        from shesha.rlm.trace_writer import TraceWriter
+
+        trace = Trace()
+        trace.add_step(
+            StepType.CODE_OUTPUT,
+            "API key: sk-abc123def456ghi789jkl012mno345pqr678",
+            iteration=0,
+        )
+
+        writer = TraceWriter(storage)
+        path = writer.write_trace(
+            project_id="test-project",
+            trace=trace,
+            context=context,
+            answer="done",
+            token_usage=TokenUsage(),
+            execution_time=1.0,
+            status="success",
+        )
+
+        content = path.read_text()
+        assert "sk-abc123" not in content
+        assert "[REDACTED]" in content
+
+    def test_write_failure_does_not_raise(
+        self, storage: FilesystemStorage, context: QueryContext
+    ) -> None:
+        """Write failures return None instead of raising."""
+        from shesha.rlm.trace_writer import TraceWriter
+
+        trace = Trace()
+        trace.add_step(StepType.CODE_GENERATED, "code", iteration=0)
+
+        writer = TraceWriter(storage)
+
+        # Make traces dir read-only to force write failure
+        traces_dir = storage.get_traces_dir("test-project")
+        traces_dir.chmod(0o444)
+
+        try:
+            result = writer.write_trace(
+                project_id="test-project",
+                trace=trace,
+                context=context,
+                answer="done",
+                token_usage=TokenUsage(),
+                execution_time=1.0,
+                status="success",
+            )
+            # Should return None on failure, not raise
+            assert result is None
+        finally:
+            # Restore permissions for cleanup
+            traces_dir.chmod(0o755)
