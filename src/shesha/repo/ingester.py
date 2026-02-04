@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.parse import urlparse, urlunparse
 
 from shesha.exceptions import AuthenticationError, RepoIngestError
+from shesha.security.paths import safe_path
 
 
 class RepoIngester:
@@ -26,6 +27,10 @@ class RepoIngester:
         self.storage_path = Path(storage_path)
         self.repos_dir = self.storage_path / "repos"
         self.repos_dir.mkdir(parents=True, exist_ok=True)
+
+    def _repo_path(self, project_id: str) -> Path:
+        """Get safe path for a project's repo directory."""
+        return safe_path(self.repos_dir, project_id)
 
     def is_local_path(self, url: str) -> bool:
         """Check if url is a local filesystem path."""
@@ -70,7 +75,7 @@ class RepoIngester:
         token: str | None = None,
     ) -> Path:
         """Clone a git repository."""
-        repo_path = self.repos_dir / project_id
+        repo_path = self._repo_path(project_id)
         repo_path.mkdir(parents=True, exist_ok=True)
 
         clone_url = self._inject_token(url, token) if token else url
@@ -100,14 +105,14 @@ class RepoIngester:
 
     def save_sha(self, project_id: str, sha: str) -> None:
         """Save the HEAD SHA for a project."""
-        repo_path = self.repos_dir / project_id
+        repo_path = self._repo_path(project_id)
         repo_path.mkdir(parents=True, exist_ok=True)
         meta_path = repo_path / "_repo_meta.json"
         meta_path.write_text(json.dumps({"head_sha": sha}))
 
     def save_source_url(self, project_id: str, url: str) -> None:
         """Save the source URL for a project."""
-        repo_path = self.repos_dir / project_id
+        repo_path = self._repo_path(project_id)
         repo_path.mkdir(parents=True, exist_ok=True)
         meta_path = repo_path / "_repo_meta.json"
 
@@ -122,7 +127,7 @@ class RepoIngester:
 
     def get_source_url(self, project_id: str) -> str | None:
         """Get the saved source URL for a project."""
-        meta_path = self.repos_dir / project_id / "_repo_meta.json"
+        meta_path = self._repo_path(project_id) / "_repo_meta.json"
         if not meta_path.exists():
             return None
         data = json.loads(meta_path.read_text())
@@ -131,7 +136,7 @@ class RepoIngester:
 
     def get_saved_sha(self, project_id: str) -> str | None:
         """Get the saved HEAD SHA for a project."""
-        meta_path = self.repos_dir / project_id / "_repo_meta.json"
+        meta_path = self._repo_path(project_id) / "_repo_meta.json"
         if not meta_path.exists():
             return None
         data = json.loads(meta_path.read_text())
@@ -158,7 +163,7 @@ class RepoIngester:
         Returns:
             The remote origin URL, or None if not found.
         """
-        repo_path = self.repos_dir / project_id
+        repo_path = self._repo_path(project_id)
         if not repo_path.exists():
             return None
 
@@ -176,7 +181,7 @@ class RepoIngester:
 
     def get_local_sha(self, project_id: str) -> str | None:
         """Get the HEAD SHA from a local cloned repo."""
-        repo_path = self.repos_dir / project_id
+        repo_path = self._repo_path(project_id)
         return self.get_sha_from_path(repo_path)
 
     def get_sha_from_path(self, repo_path: Path) -> str | None:
@@ -206,7 +211,7 @@ class RepoIngester:
         Returns:
             List of relative file paths.
         """
-        repo_path = self.repos_dir / project_id
+        repo_path = self._repo_path(project_id)
         return self.list_files_from_path(repo_path, subdir)
 
     def list_files_from_path(self, repo_path: Path, subdir: str | None = None) -> list[str]:
@@ -238,7 +243,7 @@ class RepoIngester:
 
     def fetch(self, project_id: str) -> None:
         """Fetch updates from remote."""
-        repo_path = self.repos_dir / project_id
+        repo_path = self._repo_path(project_id)
 
         subprocess.run(
             ["git", "fetch", "origin"],
@@ -252,7 +257,7 @@ class RepoIngester:
         Raises:
             RepoIngestError: If pull fails.
         """
-        repo_path = self.repos_dir / project_id
+        repo_path = self._repo_path(project_id)
         url = f"repo at {repo_path}"
 
         result = subprocess.run(
@@ -267,6 +272,6 @@ class RepoIngester:
 
     def delete_repo(self, project_id: str) -> None:
         """Delete the cloned repository directory for a project."""
-        repo_path = self.repos_dir / project_id
+        repo_path = self._repo_path(project_id)
         if repo_path.exists():
             shutil.rmtree(repo_path)

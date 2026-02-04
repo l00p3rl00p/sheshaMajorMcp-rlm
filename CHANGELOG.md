@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Host memory exhaustion via unbounded container output buffering
+- Execution hanging indefinitely when container drips output without newlines
+- Oversized JSON messages from container causing memory/CPU spike
+- Path traversal in repository ingestion when project_id contains path separators
+- Path traversal in raw file storage when document name contains path separators
+
+### Security
+
+- Added protocol limits for container communication (max buffer 10MB, max line 1MB, deadline 5min)
+- Applied `safe_path()` consistently to all filesystem operations in repo ingestion and storage
+
 ## [0.2.0] - 2026-02-04
 
 ### Added

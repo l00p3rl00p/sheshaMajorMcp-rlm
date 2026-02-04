@@ -1,9 +1,45 @@
 """Tests for sandbox executor."""
 
+import time
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from shesha.sandbox.executor import ContainerExecutor, ExecutionResult
 from shesha.security.containers import ContainerSecurityConfig
+
+
+class TestProtocolError:
+    """Tests for ProtocolError exception."""
+
+    def test_protocol_error_exists(self):
+        """ProtocolError is importable from executor module."""
+        from shesha.sandbox.executor import ProtocolError
+
+        err = ProtocolError("test message")
+        assert str(err) == "test message"
+
+
+class TestProtocolLimits:
+    """Tests for protocol limit constants."""
+
+    def test_max_buffer_size_exists(self):
+        """MAX_BUFFER_SIZE constant is defined."""
+        from shesha.sandbox.executor import MAX_BUFFER_SIZE
+
+        assert MAX_BUFFER_SIZE == 10 * 1024 * 1024  # 10 MB
+
+    def test_max_line_length_exists(self):
+        """MAX_LINE_LENGTH constant is defined."""
+        from shesha.sandbox.executor import MAX_LINE_LENGTH
+
+        assert MAX_LINE_LENGTH == 1 * 1024 * 1024  # 1 MB
+
+    def test_max_read_duration_exists(self):
+        """MAX_READ_DURATION constant is defined."""
+        from shesha.sandbox.executor import MAX_READ_DURATION
+
+        assert MAX_READ_DURATION == 300  # 5 minutes
 
 
 def make_docker_frame(data: bytes, stream_type: int = 1) -> bytes:
@@ -257,6 +293,45 @@ class TestConnectionClose:
         assert result == '{"result": "data"}'
 
 
+class TestBufferLimits:
+    """Tests for buffer size limits in _read_line."""
+
+    def test_read_line_raises_on_oversized_data_without_newline(self):
+        """_read_line raises ProtocolError when data exceeds limits without newline."""
+        from shesha.sandbox.executor import MAX_BUFFER_SIZE, ProtocolError
+
+        mock_socket = MagicMock()
+        # Send chunks that would exceed MAX_BUFFER_SIZE without a newline
+        # Note: This will now hit MAX_LINE_LENGTH (1MB) before MAX_BUFFER_SIZE (10MB)
+        # since we check line length for streaming data without newlines
+        chunk_size = 1024 * 1024  # 1 MB chunks
+        chunks_needed = (MAX_BUFFER_SIZE // chunk_size) + 2
+
+        chunk_data = [b"x" * chunk_size for _ in range(chunks_needed)]
+        chunk_iter = iter(chunk_data)
+
+        def mock_recv(size):
+            try:
+                return next(chunk_iter)
+            except StopIteration:
+                return b""
+
+        mock_socket._sock.recv = mock_recv
+        mock_socket._sock.settimeout = MagicMock()
+
+        executor = ContainerExecutor()
+        executor._socket = mock_socket
+        executor._raw_buffer = b""
+        executor._content_buffer = b""
+
+        with pytest.raises(ProtocolError) as exc_info:
+            executor._read_line(timeout=5)
+
+        # Either buffer overflow or line length limit - both protect against DoS
+        error_msg = str(exc_info.value).lower()
+        assert "buffer" in error_msg or "line" in error_msg
+
+
 class TestContainerExecutor:
     """Tests for ContainerExecutor."""
 
@@ -388,3 +463,311 @@ class TestContainerSecurityIntegration:
         assert call_kwargs["cap_drop"] == ["NET_ADMIN"]
 
         executor.stop()
+
+
+class TestLineLengthLimit:
+    """Tests for line length limit in _read_line."""
+
+    def test_read_line_raises_on_oversized_line(self):
+        """_read_line raises ProtocolError when line exceeds MAX_LINE_LENGTH."""
+        from shesha.sandbox.executor import (
+            MAX_LINE_LENGTH,
+            ContainerExecutor,
+            ProtocolError,
+        )
+
+        mock_socket = MagicMock()
+
+        # Create a line that exceeds MAX_LINE_LENGTH
+        oversized_line = b"x" * (MAX_LINE_LENGTH + 100) + b"\n"
+        frame = make_docker_frame(oversized_line)
+
+        chunks = [frame]
+        chunk_iter = iter(chunks)
+
+        def mock_recv(size):
+            try:
+                return next(chunk_iter)
+            except StopIteration:
+                return b""
+
+        mock_socket._sock.recv = mock_recv
+        mock_socket._sock.settimeout = MagicMock()
+
+        executor = ContainerExecutor()
+        executor._socket = mock_socket
+        executor._raw_buffer = b""
+        executor._content_buffer = b""
+
+        with pytest.raises(ProtocolError) as exc_info:
+            executor._read_line(timeout=5)
+
+        assert "line" in str(exc_info.value).lower()
+
+    def test_read_line_raises_on_streaming_oversized_line_without_newline(self):
+        """_read_line raises when data streams past MAX_LINE_LENGTH without newline."""
+        from shesha.sandbox.executor import (
+            MAX_LINE_LENGTH,
+            ContainerExecutor,
+            ProtocolError,
+        )
+
+        mock_socket = MagicMock()
+
+        # Stream chunks without newline that total > MAX_LINE_LENGTH
+        chunk_size = 100_000  # 100KB chunks
+        chunks_needed = (MAX_LINE_LENGTH // chunk_size) + 2  # Exceed limit
+        chunk_data = b"x" * chunk_size
+        chunks_sent = 0
+
+        def mock_recv(size):
+            nonlocal chunks_sent
+            if chunks_sent < chunks_needed:
+                chunks_sent += 1
+                # Return Docker-framed data without newline
+                return make_docker_frame(chunk_data)
+            # Keep connection open (don't return b"")
+            time.sleep(0.1)
+            return make_docker_frame(chunk_data)
+
+        mock_socket._sock.recv = mock_recv
+        mock_socket._sock.settimeout = MagicMock()
+
+        executor = ContainerExecutor()
+        executor._socket = mock_socket
+        executor._raw_buffer = b""
+        executor._content_buffer = b""
+
+        with pytest.raises(ProtocolError) as exc_info:
+            executor._read_line(timeout=5)
+
+        assert "line" in str(exc_info.value).lower()
+
+
+class TestReadDeadline:
+    """Tests for overall deadline in _read_line."""
+
+    def test_read_line_raises_on_deadline_exceeded(self):
+        """_read_line raises ProtocolError when total time exceeds MAX_READ_DURATION."""
+        from shesha.sandbox.executor import ContainerExecutor, ProtocolError
+
+        mock_socket = MagicMock()
+
+        # Simulate slow drip that would exceed deadline
+        call_count = 0
+
+        def mock_recv(size):
+            nonlocal call_count
+            call_count += 1
+            # Return small chunks without newline
+            if call_count < 100:
+                return b"x"
+            return b""
+
+        mock_socket._sock.recv = mock_recv
+        mock_socket._sock.settimeout = MagicMock()
+
+        executor = ContainerExecutor()
+        executor._socket = mock_socket
+        executor._raw_buffer = b""
+        executor._content_buffer = b""
+
+        # Patch time.monotonic (not time.time) to simulate elapsed time exceeding deadline
+        # Using monotonic avoids issues with wall-clock jumps (NTP, manual changes)
+        start_time = time.monotonic()
+        call_sequence = [start_time, start_time + 301]  # 301 seconds elapsed
+        time_iter = iter(call_sequence)
+
+        def mock_monotonic():
+            try:
+                return next(time_iter)
+            except StopIteration:
+                return start_time + 400
+
+        with patch("shesha.sandbox.executor.time.monotonic", mock_monotonic):
+            with pytest.raises(ProtocolError) as exc_info:
+                executor._read_line(timeout=5)
+
+        assert (
+            "duration" in str(exc_info.value).lower() or "deadline" in str(exc_info.value).lower()
+        )
+
+    def test_read_line_enforces_deadline_in_inner_frame_loop(self):
+        """_read_line enforces deadline inside Docker frame reading loop.
+
+        This tests that the deadline is checked inside the inner loop that reads
+        Docker frame payloads, not just at the outer loop start. A malicious
+        container could drip data slowly to keep the inner loop spinning.
+        """
+        from shesha.sandbox.executor import ContainerExecutor, ProtocolError
+
+        mock_socket = MagicMock()
+
+        # Simulate a large Docker frame that drips in slowly
+        # Header says 10000 bytes, but we drip small chunks
+        header = bytes([1, 0, 0, 0, 0, 0, 0x27, 0x10])  # stream=1, length=10000
+        recv_count = 0
+
+        def mock_recv(size):
+            nonlocal recv_count
+            recv_count += 1
+            if recv_count == 1:
+                return header  # Send header first
+            # Then drip payload in small chunks (simulating slow attack)
+            # This keeps us in the inner frame-reading loop
+            return b"x" * 10  # Small chunk, need many to reach 10000
+
+        mock_socket._sock.recv = mock_recv
+        mock_socket._sock.settimeout = MagicMock()
+
+        executor = ContainerExecutor()
+        executor._socket = mock_socket
+        executor._raw_buffer = b""
+        executor._content_buffer = b""
+
+        # Time: first check passes, subsequent checks inside inner loop should fail
+        start_time = 1000.0
+        monotonic_calls = 0
+
+        def mock_monotonic():
+            nonlocal monotonic_calls
+            monotonic_calls += 1
+            if monotonic_calls <= 2:
+                # First two calls: outer loop check and inner loop entry
+                return start_time
+            # After that: simulate time has exceeded deadline
+            # This should be caught inside the inner loop
+            return start_time + 301
+
+        with patch("shesha.sandbox.executor.time.monotonic", mock_monotonic):
+            with pytest.raises(ProtocolError) as exc_info:
+                executor._read_line(timeout=5)
+
+        assert "duration" in str(exc_info.value).lower()
+
+
+class TestExecuteProtocolHandling:
+    """Tests for ProtocolError handling in execute()."""
+
+    def test_execute_returns_error_result_on_protocol_error(self):
+        """execute() returns error ExecutionResult when ProtocolError occurs."""
+        from shesha.sandbox.executor import ContainerExecutor, ProtocolError
+
+        executor = ContainerExecutor()
+        executor._socket = MagicMock()
+
+        # Mock _read_line to raise ProtocolError
+        with patch.object(executor, "_read_line", side_effect=ProtocolError("buffer overflow")):
+            with patch.object(executor, "_send_raw"):
+                result = executor.execute("print('hello')")
+
+        assert result.status == "error"
+        assert "protocol" in result.error.lower() or "buffer" in result.error.lower()
+
+    def test_execute_stops_container_on_protocol_error(self):
+        """execute() stops the container when ProtocolError occurs."""
+        from shesha.sandbox.executor import ContainerExecutor, ProtocolError
+
+        executor = ContainerExecutor()
+        executor._socket = MagicMock()
+
+        # Mock _read_line to raise ProtocolError and track stop() call
+        with patch.object(executor, "_read_line", side_effect=ProtocolError("malicious data")):
+            with patch.object(executor, "_send_raw"):
+                with patch.object(executor, "stop") as mock_stop:
+                    executor.execute("print('hello')")
+
+        # Container should be stopped after protocol violation
+        mock_stop.assert_called_once()
+
+    def test_execute_handles_invalid_json_as_protocol_error(self):
+        """execute() treats invalid JSON from container as protocol violation."""
+        from shesha.sandbox.executor import ContainerExecutor
+
+        executor = ContainerExecutor()
+        executor._socket = MagicMock()
+
+        # Container returns invalid JSON (e.g., sandbox wrote to sys.__stdout__)
+        with patch.object(executor, "_read_line", return_value="not valid json {{{"):
+            with patch.object(executor, "_send_raw"):
+                with patch.object(executor, "stop") as mock_stop:
+                    result = executor.execute("print('hello')")
+
+        # Should return error result, not raise JSONDecodeError
+        assert result.status == "error"
+        assert "json" in result.error.lower() or "protocol" in result.error.lower()
+        # Container should be stopped (invalid output = compromised state)
+        mock_stop.assert_called_once()
+
+    def test_execute_handles_malformed_llm_query_as_protocol_error(self):
+        """execute() treats llm_query missing required fields as protocol violation."""
+        from shesha.sandbox.executor import ContainerExecutor
+
+        executor = ContainerExecutor()
+        executor._socket = MagicMock()
+        # Set a handler so we actually try to access the fields
+        executor.llm_query_handler = MagicMock()
+
+        # Malformed llm_query - missing 'instruction' and 'content' fields
+        malformed_response = '{"action": "llm_query"}'
+
+        with patch.object(executor, "_read_line", return_value=malformed_response):
+            with patch.object(executor, "_send_raw"):
+                with patch.object(executor, "stop") as mock_stop:
+                    result = executor.execute("print('hello')")
+
+        # Should return error result, not raise KeyError
+        assert result.status == "error"
+        assert "protocol" in result.error.lower() or "missing" in result.error.lower()
+        # Container should be stopped
+        mock_stop.assert_called_once()
+
+    def test_execute_handles_non_utf8_as_protocol_error(self):
+        """execute() treats non-UTF8 bytes from container as protocol violation."""
+        from shesha.sandbox.executor import ContainerExecutor
+
+        executor = ContainerExecutor()
+        executor._socket = MagicMock()
+
+        # Container sends invalid UTF-8 bytes (e.g., via sys.stdout.buffer)
+        # \xff\xfe is invalid UTF-8
+        invalid_utf8 = b'\xff\xfe{"status": "ok"}\n'
+        frame = make_docker_frame(invalid_utf8)
+
+        chunks = [frame]
+        chunk_iter = iter(chunks)
+
+        def mock_recv(size):
+            try:
+                return next(chunk_iter)
+            except StopIteration:
+                return b""
+
+        executor._socket._sock.recv = mock_recv
+        executor._socket._sock.settimeout = MagicMock()
+        executor._raw_buffer = b""
+        executor._content_buffer = b""
+
+        with patch.object(executor, "_send_raw"):
+            with patch.object(executor, "stop") as mock_stop:
+                result = executor.execute("print('hello')")
+
+        # Should return error result, not raise UnicodeDecodeError
+        assert result.status == "error"
+        assert "protocol" in result.error.lower() or "decode" in result.error.lower()
+        # Container should be stopped
+        mock_stop.assert_called_once()
+
+    def test_execute_returns_error_when_socket_is_none(self):
+        """execute() returns error result when called after stop() (no socket)."""
+        from shesha.sandbox.executor import ContainerExecutor
+
+        executor = ContainerExecutor()
+        # Simulate stopped state - socket is None
+        executor._socket = None
+
+        result = executor.execute("print('hello')")
+
+        # Should return error result, not raise RuntimeError
+        assert result.status == "error"
+        assert "stopped" in result.error.lower() or "socket" in result.error.lower()

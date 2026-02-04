@@ -1,6 +1,7 @@
 """Docker container executor for sandboxed code execution."""
 
 import json
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -10,6 +11,18 @@ from docker.errors import DockerException
 from docker.models.containers import Container
 
 from shesha.security.containers import DEFAULT_SECURITY, ContainerSecurityConfig
+
+
+class ProtocolError(Exception):
+    """Container protocol violation (oversized data, timeout)."""
+
+    pass
+
+
+# Protocol limits to prevent DoS attacks from malicious containers
+MAX_BUFFER_SIZE = 10 * 1024 * 1024  # 10 MB max buffer
+MAX_LINE_LENGTH = 1 * 1024 * 1024  # 1 MB max single line
+MAX_READ_DURATION = 300  # 5 min total deadline
 
 
 @dataclass
@@ -104,53 +117,108 @@ class ContainerExecutor:
 
     def execute(self, code: str, timeout: int = 30) -> ExecutionResult:
         """Execute code in the container, handling llm_query callbacks."""
+        # Check if executor is in stopped state (e.g., after protocol error)
+        if self._socket is None:
+            return ExecutionResult(
+                status="error",
+                stdout="",
+                stderr="",
+                return_value=None,
+                error="Executor stopped: no socket connection",
+            )
+
         self._send_raw(json.dumps({"action": "execute", "code": code}) + "\n")
 
-        # Handle responses, which may include llm_query requests
-        while True:
-            response_line = self._read_line(timeout=timeout)
-            result = json.loads(response_line)
+        try:
+            # Handle responses, which may include llm_query requests
+            while True:
+                response_line = self._read_line(timeout=timeout)
+                result = json.loads(response_line)
 
-            # Check if this is an llm_query request
-            if result.get("action") == "llm_query":
-                if self.llm_query_handler is None:
-                    # No handler - send error back
-                    self._send_raw(
-                        json.dumps(
-                            {
-                                "action": "llm_response",
-                                "result": "ERROR: No LLM query handler configured",
-                            }
+                # Check if this is an llm_query request
+                if result.get("action") == "llm_query":
+                    if self.llm_query_handler is None:
+                        # No handler - send error back
+                        self._send_raw(
+                            json.dumps(
+                                {
+                                    "action": "llm_response",
+                                    "result": "ERROR: No LLM query handler configured",
+                                }
+                            )
+                            + "\n"
                         )
-                        + "\n"
-                    )
-                else:
-                    # Call handler and send response back
-                    llm_response = self.llm_query_handler(
-                        result["instruction"],
-                        result["content"],
-                    )
-                    self._send_raw(
-                        json.dumps(
-                            {
-                                "action": "llm_response",
-                                "result": llm_response,
-                            }
+                    else:
+                        # Call handler and send response back
+                        llm_response = self.llm_query_handler(
+                            result["instruction"],
+                            result["content"],
                         )
-                        + "\n"
-                    )
-                continue
+                        self._send_raw(
+                            json.dumps(
+                                {
+                                    "action": "llm_response",
+                                    "result": llm_response,
+                                }
+                            )
+                            + "\n"
+                        )
+                    continue
 
-            # This is the final execution result
+                # This is the final execution result
+                return ExecutionResult(
+                    status=result.get("status", "error"),
+                    stdout=result.get("stdout", ""),
+                    stderr=result.get("stderr", ""),
+                    return_value=result.get("return_value"),
+                    error=result.get("error"),
+                    final_answer=result.get("final_answer"),
+                    final_var=result.get("final_var"),
+                    final_value=result.get("final_value"),
+                )
+        except ProtocolError as e:
+            # Protocol violation implies potentially malicious/broken container state.
+            # Terminate it to prevent reuse of compromised container.
+            self.stop()
             return ExecutionResult(
-                status=result.get("status", "error"),
-                stdout=result.get("stdout", ""),
-                stderr=result.get("stderr", ""),
-                return_value=result.get("return_value"),
-                error=result.get("error"),
-                final_answer=result.get("final_answer"),
-                final_var=result.get("final_var"),
-                final_value=result.get("final_value"),
+                status="error",
+                stdout="",
+                stderr="",
+                return_value=None,
+                error=f"Protocol error: {e}",
+            )
+        except json.JSONDecodeError as e:
+            # Invalid JSON from container (e.g., sandbox wrote to sys.__stdout__).
+            # Treat as protocol violation - container is in unknown state.
+            self.stop()
+            return ExecutionResult(
+                status="error",
+                stdout="",
+                stderr="",
+                return_value=None,
+                error=f"Protocol error: invalid JSON from container: {e}",
+            )
+        except KeyError as e:
+            # Malformed message missing required fields (e.g., llm_query without
+            # instruction/content). Treat as protocol violation.
+            self.stop()
+            return ExecutionResult(
+                status="error",
+                stdout="",
+                stderr="",
+                return_value=None,
+                error=f"Protocol error: missing required field {e}",
+            )
+        except UnicodeDecodeError as e:
+            # Non-UTF8 bytes from container (e.g., writing to sys.stdout.buffer).
+            # Treat as protocol violation - container is sending invalid data.
+            self.stop()
+            return ExecutionResult(
+                status="error",
+                stdout="",
+                stderr="",
+                return_value=None,
+                error=f"Protocol error: invalid UTF-8 from container: {e}",
             )
 
     def _send_raw(self, data: str) -> None:
@@ -175,15 +243,26 @@ class ContainerExecutor:
 
         self._socket._sock.settimeout(timeout)
 
+        start_time = time.monotonic()
+
         while True:
+            if time.monotonic() - start_time > MAX_READ_DURATION:
+                raise ProtocolError(f"Read duration exceeded {MAX_READ_DURATION} seconds")
             # Check if we have a complete line in the content buffer
             if b"\n" in self._content_buffer:
                 line, self._content_buffer = self._content_buffer.split(b"\n", 1)
+                if len(line) > MAX_LINE_LENGTH:
+                    raise ProtocolError(
+                        f"Line length {len(line)} exceeds maximum {MAX_LINE_LENGTH}"
+                    )
                 return line.decode().strip()
 
             # Need more content - demux from raw buffer or read more data
             # Ensure we have at least 8 bytes for a Docker header
             while len(self._raw_buffer) < 8:
+                # Check deadline inside inner loop to prevent slow-drip DoS
+                if time.monotonic() - start_time > MAX_READ_DURATION:
+                    raise ProtocolError(f"Read duration exceeded {MAX_READ_DURATION} seconds")
                 chunk = self._socket._sock.recv(4096)
                 if not chunk:
                     # Connection closed while waiting for Docker header
@@ -198,11 +277,18 @@ class ContainerExecutor:
                     else:
                         # Possibly plain text - add to content buffer
                         self._content_buffer += self._raw_buffer
+                        if len(self._content_buffer) > MAX_BUFFER_SIZE:
+                            raise ProtocolError(f"Content buffer exceeded {MAX_BUFFER_SIZE} bytes")
                         self._raw_buffer = b""
+                    buf_len = len(self._content_buffer)
+                    if buf_len > MAX_LINE_LENGTH:
+                        raise ProtocolError(f"Line length {buf_len} exceeds max {MAX_LINE_LENGTH}")
                     result = self._content_buffer.decode().strip()
                     self._content_buffer = b""
                     return result
                 self._raw_buffer += chunk
+                if len(self._raw_buffer) > MAX_BUFFER_SIZE:
+                    raise ProtocolError(f"Raw buffer exceeded {MAX_BUFFER_SIZE} bytes")
 
             # Check if this looks like a Docker header
             if self._raw_buffer[0] in (1, 2) and self._raw_buffer[1:4] == b"\x00\x00\x00":
@@ -211,10 +297,15 @@ class ContainerExecutor:
 
                 # Read until we have the full frame (header + payload)
                 while len(self._raw_buffer) < 8 + payload_len:
+                    # Check deadline inside inner loop to prevent slow-drip DoS
+                    if time.monotonic() - start_time > MAX_READ_DURATION:
+                        raise ProtocolError(f"Read duration exceeded {MAX_READ_DURATION} seconds")
                     chunk = self._socket._sock.recv(4096)
                     if not chunk:
                         break
                     self._raw_buffer += chunk
+                    if len(self._raw_buffer) > MAX_BUFFER_SIZE:
+                        raise ProtocolError(f"Raw buffer exceeded {MAX_BUFFER_SIZE} bytes")
 
                 # Extract payload and remove the frame from raw buffer
                 payload = self._raw_buffer[8 : 8 + payload_len]
@@ -222,20 +313,50 @@ class ContainerExecutor:
 
                 # Append payload to content buffer (never mix with raw buffer)
                 self._content_buffer += payload
+                if len(self._content_buffer) > MAX_BUFFER_SIZE:
+                    raise ProtocolError(f"Content buffer exceeded {MAX_BUFFER_SIZE} bytes")
+                # Check line length limit even without newline (prevents streaming attack)
+                if (
+                    b"\n" not in self._content_buffer
+                    and len(self._content_buffer) > MAX_LINE_LENGTH
+                ):
+                    raise ProtocolError(
+                        f"Line length {len(self._content_buffer)} exceeds max {MAX_LINE_LENGTH}"
+                    )
             else:
                 # Not a Docker header - treat raw buffer as plain data
                 # This handles non-multiplexed streams
                 self._content_buffer += self._raw_buffer
+                if len(self._content_buffer) > MAX_BUFFER_SIZE:
+                    raise ProtocolError(f"Content buffer exceeded {MAX_BUFFER_SIZE} bytes")
+                # Check line length limit even without newline (prevents streaming attack)
+                if (
+                    b"\n" not in self._content_buffer
+                    and len(self._content_buffer) > MAX_LINE_LENGTH
+                ):
+                    raise ProtocolError(
+                        f"Line length {len(self._content_buffer)} exceeds max {MAX_LINE_LENGTH}"
+                    )
                 self._raw_buffer = b""
 
                 # If still no newline, read more
                 if b"\n" not in self._content_buffer:
+                    # Check deadline before recv to prevent slow-drip DoS
+                    if time.monotonic() - start_time > MAX_READ_DURATION:
+                        raise ProtocolError(f"Read duration exceeded {MAX_READ_DURATION} seconds")
                     chunk = self._socket._sock.recv(4096)
                     if not chunk:
+                        buf_len = len(self._content_buffer)
+                        if buf_len > MAX_LINE_LENGTH:
+                            raise ProtocolError(
+                                f"Line length {buf_len} exceeds max {MAX_LINE_LENGTH}"
+                            )
                         result = self._content_buffer.decode().strip()
                         self._content_buffer = b""
                         return result
                     self._raw_buffer += chunk
+                    if len(self._raw_buffer) > MAX_BUFFER_SIZE:
+                        raise ProtocolError(f"Raw buffer exceeded {MAX_BUFFER_SIZE} bytes")
 
     def _send_command(self, command: dict[str, Any], timeout: int = 30) -> dict[str, Any]:
         """Send a JSON command to the container and get response."""
