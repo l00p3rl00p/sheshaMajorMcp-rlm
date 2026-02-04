@@ -325,3 +325,76 @@ class TestCheckRepoForUpdates:
                     shesha.check_repo_for_updates("my-project")
 
                 assert "No repository URL" in str(exc_info.value)
+
+
+class TestGetProjectInfo:
+    """Tests for get_project_info method."""
+
+    def test_returns_info_for_remote_repo(self, tmp_path: Path):
+        """get_project_info returns correct info for remote repo project."""
+        with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
+            with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
+                mock_ingester = MagicMock()
+                mock_ingester_cls.return_value = mock_ingester
+
+                mock_ingester.get_source_url.return_value = "https://github.com/org/repo"
+                mock_ingester.is_local_path.return_value = False
+
+                shesha = Shesha(model="test-model", storage_path=tmp_path)
+                shesha._storage.create_project("my-project")
+
+                info = shesha.get_project_info("my-project")
+
+                assert info.project_id == "my-project"
+                assert info.source_url == "https://github.com/org/repo"
+                assert info.is_local is False
+                assert info.source_exists is True
+
+    def test_returns_info_for_existing_local_repo(self, tmp_path: Path):
+        """get_project_info returns source_exists=True when local path exists."""
+        with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
+            with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
+                mock_ingester = MagicMock()
+                mock_ingester_cls.return_value = mock_ingester
+
+                local_path = tmp_path / "local_repo"
+                local_path.mkdir()
+
+                mock_ingester.get_source_url.return_value = str(local_path)
+                mock_ingester.is_local_path.return_value = True
+
+                shesha = Shesha(model="test-model", storage_path=tmp_path)
+                shesha._storage.create_project("local-project")
+
+                info = shesha.get_project_info("local-project")
+
+                assert info.is_local is True
+                assert info.source_exists is True
+
+    def test_returns_info_for_missing_local_repo(self, tmp_path: Path):
+        """get_project_info returns source_exists=False when local path missing."""
+        with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
+            with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
+                mock_ingester = MagicMock()
+                mock_ingester_cls.return_value = mock_ingester
+
+                mock_ingester.get_source_url.return_value = "/nonexistent/path"
+                mock_ingester.is_local_path.return_value = True
+
+                shesha = Shesha(model="test-model", storage_path=tmp_path)
+                shesha._storage.create_project("missing-project")
+
+                info = shesha.get_project_info("missing-project")
+
+                assert info.is_local is True
+                assert info.source_exists is False
+
+    def test_raises_for_nonexistent_project(self, tmp_path: Path):
+        """get_project_info raises ValueError for non-existent project."""
+        with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
+            shesha = Shesha(model="test-model", storage_path=tmp_path)
+
+            with pytest.raises(ValueError) as exc_info:
+                shesha.get_project_info("nonexistent")
+
+            assert "does not exist" in str(exc_info.value)
