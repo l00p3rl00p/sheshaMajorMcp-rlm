@@ -260,6 +260,9 @@ class ContainerExecutor:
             # Need more content - demux from raw buffer or read more data
             # Ensure we have at least 8 bytes for a Docker header
             while len(self._raw_buffer) < 8:
+                # Check deadline inside inner loop to prevent slow-drip DoS
+                if time.monotonic() - start_time > MAX_READ_DURATION:
+                    raise ProtocolError(f"Read duration exceeded {MAX_READ_DURATION} seconds")
                 chunk = self._socket._sock.recv(4096)
                 if not chunk:
                     # Connection closed while waiting for Docker header
@@ -294,6 +297,9 @@ class ContainerExecutor:
 
                 # Read until we have the full frame (header + payload)
                 while len(self._raw_buffer) < 8 + payload_len:
+                    # Check deadline inside inner loop to prevent slow-drip DoS
+                    if time.monotonic() - start_time > MAX_READ_DURATION:
+                        raise ProtocolError(f"Read duration exceeded {MAX_READ_DURATION} seconds")
                     chunk = self._socket._sock.recv(4096)
                     if not chunk:
                         break
@@ -329,6 +335,9 @@ class ContainerExecutor:
 
                 # If still no newline, read more
                 if b"\n" not in self._content_buffer:
+                    # Check deadline before recv to prevent slow-drip DoS
+                    if time.monotonic() - start_time > MAX_READ_DURATION:
+                        raise ProtocolError(f"Read duration exceeded {MAX_READ_DURATION} seconds")
                     chunk = self._socket._sock.recv(4096)
                     if not chunk:
                         buf_len = len(self._content_buffer)

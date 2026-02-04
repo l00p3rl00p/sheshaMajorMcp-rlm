@@ -592,6 +592,59 @@ class TestReadDeadline:
             "duration" in str(exc_info.value).lower() or "deadline" in str(exc_info.value).lower()
         )
 
+    def test_read_line_enforces_deadline_in_inner_frame_loop(self):
+        """_read_line enforces deadline inside Docker frame reading loop.
+
+        This tests that the deadline is checked inside the inner loop that reads
+        Docker frame payloads, not just at the outer loop start. A malicious
+        container could drip data slowly to keep the inner loop spinning.
+        """
+        from shesha.sandbox.executor import ContainerExecutor, ProtocolError
+
+        mock_socket = MagicMock()
+
+        # Simulate a large Docker frame that drips in slowly
+        # Header says 10000 bytes, but we drip small chunks
+        header = bytes([1, 0, 0, 0, 0, 0, 0x27, 0x10])  # stream=1, length=10000
+        recv_count = 0
+
+        def mock_recv(size):
+            nonlocal recv_count
+            recv_count += 1
+            if recv_count == 1:
+                return header  # Send header first
+            # Then drip payload in small chunks (simulating slow attack)
+            # This keeps us in the inner frame-reading loop
+            return b"x" * 10  # Small chunk, need many to reach 10000
+
+        mock_socket._sock.recv = mock_recv
+        mock_socket._sock.settimeout = MagicMock()
+
+        executor = ContainerExecutor()
+        executor._socket = mock_socket
+        executor._raw_buffer = b""
+        executor._content_buffer = b""
+
+        # Time: first check passes, subsequent checks inside inner loop should fail
+        start_time = 1000.0
+        monotonic_calls = 0
+
+        def mock_monotonic():
+            nonlocal monotonic_calls
+            monotonic_calls += 1
+            if monotonic_calls <= 2:
+                # First two calls: outer loop check and inner loop entry
+                return start_time
+            # After that: simulate time has exceeded deadline
+            # This should be caught inside the inner loop
+            return start_time + 301
+
+        with patch("shesha.sandbox.executor.time.monotonic", mock_monotonic):
+            with pytest.raises(ProtocolError) as exc_info:
+                executor._read_line(timeout=5)
+
+        assert "duration" in str(exc_info.value).lower()
+
 
 class TestExecuteProtocolHandling:
     """Tests for ProtocolError handling in execute()."""
