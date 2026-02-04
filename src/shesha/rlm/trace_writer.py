@@ -79,6 +79,21 @@ class TraceWriter:
             }
             lines.append(json.dumps(step_data))
 
+        # Summary
+        max_iteration = max((s.iteration for s in trace.steps), default=0)
+        summary = {
+            "type": "summary",
+            "answer": answer,
+            "total_iterations": max_iteration + 1,
+            "total_tokens": {
+                "prompt": token_usage.prompt_tokens,
+                "completion": token_usage.completion_tokens,
+            },
+            "total_duration_ms": int(execution_time * 1000),
+            "status": status,
+        }
+        lines.append(json.dumps(summary))
+
         # Write file
         path = traces_dir / filename
         path.write_text("\n".join(lines) + "\n")

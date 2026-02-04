@@ -188,3 +188,33 @@ class TestTraceWriterContent:
         step3 = json.loads(lines[3])
         assert step3["type"] == "step"
         assert step3["step_type"] == "final_answer"
+
+    def test_trace_file_ends_with_summary(
+        self,
+        storage: FilesystemStorage,
+        trace: Trace,
+        context: QueryContext,
+    ) -> None:
+        """Last line of trace file is summary with totals."""
+        from shesha.rlm.trace_writer import TraceWriter
+
+        writer = TraceWriter(storage)
+        path = writer.write_trace(
+            project_id="test-project",
+            trace=trace,
+            context=context,
+            answer="42",
+            token_usage=TokenUsage(prompt_tokens=100, completion_tokens=50),
+            execution_time=1.5,
+            status="success",
+        )
+
+        lines = path.read_text().strip().split("\n")
+        summary = json.loads(lines[-1])
+
+        assert summary["type"] == "summary"
+        assert summary["answer"] == "42"
+        assert summary["total_iterations"] == 1  # iteration 0 = 1 iteration
+        assert summary["total_tokens"] == {"prompt": 100, "completion": 50}
+        assert summary["total_duration_ms"] == 1500
+        assert summary["status"] == "success"
