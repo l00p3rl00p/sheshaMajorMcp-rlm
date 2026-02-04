@@ -184,7 +184,7 @@ def show_picker(shesha: Shesha) -> tuple[str, bool] | None:
                     print()
                     continue  # Re-show picker
             except ValueError:
-                pass
+                pass  # Not a valid "d<N>" command, fall through to other handlers
 
         # Check if it's a number selecting an existing project
         try:
@@ -192,7 +192,7 @@ def show_picker(shesha: Shesha) -> tuple[str, bool] | None:
             if 1 <= num <= len(projects):
                 return (projects[num - 1], True)
         except ValueError:
-            pass
+            pass  # Not a number, treat as URL/path below
 
         # Otherwise treat as new URL/path
         return (user_input, False)
