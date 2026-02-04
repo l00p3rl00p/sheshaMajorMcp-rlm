@@ -10,7 +10,7 @@ import docker
 from docker.errors import DockerException
 
 from shesha.config import SheshaConfig
-from shesha.models import ParsedDocument, RepoProjectResult
+from shesha.models import ParsedDocument, ProjectInfo, RepoProjectResult
 from shesha.parser import create_default_registry
 from shesha.project import Project
 from shesha.repo.ingester import RepoIngester
@@ -126,9 +126,88 @@ class Shesha:
         """List all projects."""
         return self._storage.list_projects()
 
-    def delete_project(self, project_id: str) -> None:
-        """Delete a project."""
+    def delete_project(self, project_id: str, *, cleanup_repo: bool = True) -> None:
+        """Delete a project and optionally its cloned repository.
+
+        Args:
+            project_id: Project to delete.
+            cleanup_repo: If True (default), also removes cloned repo data
+                for remote repositories. Has no effect for projects
+                created from local paths.
+        """
+        if cleanup_repo:
+            source_url = self._repo_ingester.get_source_url(project_id)
+            if source_url and not self._repo_ingester.is_local_path(source_url):
+                self._repo_ingester.delete_repo(project_id)
+
         self._storage.delete_project(project_id)
+
+    def get_project_info(self, project_id: str) -> ProjectInfo:
+        """Get metadata about a project.
+
+        Args:
+            project_id: ID of the project.
+
+        Returns:
+            ProjectInfo with source URL, whether it's local, and source existence.
+
+        Raises:
+            ValueError: If project doesn't exist.
+        """
+        if not self._storage.project_exists(project_id):
+            raise ValueError(f"Project '{project_id}' does not exist")
+
+        source_url = self._repo_ingester.get_source_url(project_id)
+
+        if source_url is None:
+            return ProjectInfo(
+                project_id=project_id,
+                source_url=None,
+                is_local=False,
+                source_exists=True,
+            )
+
+        is_local = self._repo_ingester.is_local_path(source_url)
+
+        if is_local:
+            source_exists = Path(source_url).expanduser().exists()
+        else:
+            source_exists = True  # Remote repos always "exist"
+
+        return ProjectInfo(
+            project_id=project_id,
+            source_url=source_url,
+            is_local=is_local,
+            source_exists=source_exists,
+        )
+
+    def check_repo_for_updates(self, project_id: str) -> RepoProjectResult:
+        """Check if a cloned repository has updates available.
+
+        This retrieves the stored repository URL and checks if the remote
+        has newer commits than the locally cached version.
+
+        Args:
+            project_id: ID of an existing project created from a repository.
+
+        Returns:
+            RepoProjectResult with status 'unchanged' or 'updates_available'.
+
+        Raises:
+            ValueError: If project doesn't exist or has no stored repo URL.
+        """
+        if not self._storage.project_exists(project_id):
+            raise ValueError(f"Project '{project_id}' does not exist")
+
+        url = self._repo_ingester.get_repo_url(project_id)
+        if not url:
+            raise ValueError(
+                f"No repository URL found for project '{project_id}'. "
+                "This project may not have been created from a repository."
+            )
+
+        token = self._repo_ingester.resolve_token(url, None)
+        return self._handle_existing_project(url, project_id, token, None)
 
     def register_parser(self, parser: "DocumentParser") -> None:
         """Register a custom document parser."""
@@ -289,6 +368,9 @@ class Shesha:
         sha = self._repo_ingester.get_sha_from_path(repo_path)
         if sha:
             self._repo_ingester.save_sha(name, sha)
+
+        # Save source URL for later retrieval
+        self._repo_ingester.save_source_url(name, url)
 
         project = self.get_project(name)
         return RepoProjectResult(

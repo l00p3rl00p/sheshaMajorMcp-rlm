@@ -298,17 +298,21 @@ class TestMain:
         captured = capsys.readouterr()
         assert "SHESHA_API_KEY" in captured.out
 
-    def test_picker_existing_project_uses_get_project(self) -> None:
-        """Selecting existing project via picker should use get_project."""
+    def test_picker_existing_project_checks_for_updates(self) -> None:
+        """Selecting existing project via picker should check for updates."""
         import os
         import sys
 
         from examples.repo import main
 
-        mock_project = MagicMock()
+        mock_result = MagicMock()
+        mock_result.status = "unchanged"
+        mock_result.files_ingested = 10
+        mock_result.project = MagicMock()
+
         mock_shesha = MagicMock()
         mock_shesha.list_projects.return_value = ["existing-project"]
-        mock_shesha.get_project.return_value = mock_project
+        mock_shesha.check_repo_for_updates.return_value = mock_result
 
         with patch.object(sys, "argv", ["repo.py"]):
             with patch.dict(os.environ, {"SHESHA_API_KEY": "test-key"}, clear=True):
@@ -317,9 +321,47 @@ class TestMain:
                         with patch("builtins.input", side_effect=["1", "quit"]):
                             main()
 
-        # Should use get_project for existing project, NOT create_project_from_repo
-        mock_shesha.get_project.assert_called_once_with("existing-project")
-        mock_shesha.create_project_from_repo.assert_not_called()
+        # Should check for updates when loading existing project
+        mock_shesha.check_repo_for_updates.assert_called_once_with("existing-project")
+
+    def test_picker_existing_project_with_update_flag_applies_updates(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Selecting existing project with --update should auto-apply updates."""
+        import os
+        import sys
+
+        from examples.repo import main
+
+        # First result has updates available
+        mock_result = MagicMock()
+        mock_result.status = "updates_available"
+        mock_result.files_ingested = 10
+        mock_result.project = MagicMock()
+        mock_result.project.project_id = "existing-project"
+
+        # After applying updates
+        updated_result = MagicMock()
+        updated_result.status = "created"
+        updated_result.files_ingested = 15
+        updated_result.project = mock_result.project
+        mock_result.apply_updates.return_value = updated_result
+
+        mock_shesha = MagicMock()
+        mock_shesha.list_projects.return_value = ["existing-project"]
+        mock_shesha.check_repo_for_updates.return_value = mock_result
+
+        with patch.object(sys, "argv", ["repo.py", "--update"]):
+            with patch.dict(os.environ, {"SHESHA_API_KEY": "test-key"}, clear=True):
+                with patch("examples.repo.Shesha", return_value=mock_shesha):
+                    with patch("examples.repo.SheshaConfig"):
+                        with patch("builtins.input", side_effect=["1", "quit"]):
+                            main()
+
+        # Should apply updates when --update flag is set
+        mock_result.apply_updates.assert_called_once()
+        captured = capsys.readouterr()
+        assert "Applying updates" in captured.out
 
     def test_picker_new_url_uses_create_project_from_repo(self) -> None:
         """Entering new URL via picker should use create_project_from_repo."""
@@ -350,3 +392,144 @@ class TestMain:
         # Should use create_project_from_repo for new URL, NOT get_project
         mock_shesha.create_project_from_repo.assert_called_once_with("https://github.com/new/repo")
         mock_shesha.get_project.assert_not_called()
+
+    def test_show_picker_shows_missing_marker(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """show_picker marks projects with missing local repos."""
+        from examples.repo import show_picker
+        from shesha import ProjectInfo
+
+        mock_shesha = MagicMock()
+        mock_shesha.list_projects.return_value = ["remote-repo", "missing-local"]
+        mock_shesha.get_project_info.side_effect = [
+            ProjectInfo("remote-repo", "https://github.com/org/repo", False, True),
+            ProjectInfo("missing-local", "/old/path", True, False),
+        ]
+
+        with patch("builtins.input", return_value="1"):
+            show_picker(mock_shesha)
+
+        captured = capsys.readouterr()
+        assert "missing-local (missing - /old/path)" in captured.out
+
+    def test_show_picker_handles_delete_command(
+        self, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """show_picker handles 'd<N>' delete commands."""
+        from examples.repo import show_picker
+        from shesha import ProjectInfo
+
+        mock_shesha = MagicMock()
+        # First call: show list with 2 items, user enters 'd1'
+        # Second call: show list with 1 item, user enters '1'
+        mock_shesha.list_projects.side_effect = [
+            ["project-a", "project-b"],
+            ["project-b"],
+        ]
+        mock_shesha.get_project_info.side_effect = [
+            ProjectInfo("project-a", "https://github.com/org/a", False, True),
+            ProjectInfo("project-b", "https://github.com/org/b", False, True),
+            # After deletion:
+            ProjectInfo("project-b", "https://github.com/org/b", False, True),
+        ]
+
+        inputs = iter(["d1", "y", "1"])
+        monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+
+        result = show_picker(mock_shesha)
+
+        mock_shesha.delete_project.assert_called_once_with("project-a")
+        assert result == ("project-b", True)
+        captured = capsys.readouterr()
+        assert "Deleted 'project-a'" in captured.out
+
+    def test_show_picker_delete_with_confirmation_no(
+        self, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """show_picker cancels delete when user says no."""
+        from examples.repo import show_picker
+        from shesha import ProjectInfo
+
+        mock_shesha = MagicMock()
+        mock_shesha.list_projects.side_effect = [
+            ["project-a"],
+            ["project-a"],
+        ]
+        mock_shesha.get_project_info.return_value = ProjectInfo(
+            "project-a", "https://github.com/org/a", False, True
+        )
+
+        inputs = iter(["d1", "n", "1"])
+        monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+
+        result = show_picker(mock_shesha)
+
+        mock_shesha.delete_project.assert_not_called()
+        assert result == ("project-a", True)
+
+    def test_show_picker_delete_local_project_shows_correct_message(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """show_picker shows correct confirmation message for local projects."""
+        from examples.repo import show_picker
+        from shesha import ProjectInfo
+
+        mock_shesha = MagicMock()
+        mock_shesha.list_projects.side_effect = [
+            ["local-project"],
+            [],
+        ]
+        mock_shesha.get_project_info.return_value = ProjectInfo(
+            "local-project", "/path/to/local", True, True
+        )
+
+        # Track all input prompts
+        prompts: list[str] = []
+
+        def mock_input(prompt: str) -> str:
+            prompts.append(prompt)
+            if "d<N>" in prompt:
+                return "d1"
+            return "y"
+
+        monkeypatch.setattr("builtins.input", mock_input)
+
+        # After deletion, no projects remain so returns None
+        show_picker(mock_shesha)
+
+        # Local projects shouldn't mention "cloned repository"
+        confirmation_prompt = prompts[1]  # Second prompt is the confirmation
+        assert "indexed data" in confirmation_prompt
+        assert "cloned repository" not in confirmation_prompt
+
+    def test_show_picker_delete_remote_project_shows_correct_message(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """show_picker shows correct confirmation message for remote projects."""
+        from examples.repo import show_picker
+        from shesha import ProjectInfo
+
+        mock_shesha = MagicMock()
+        mock_shesha.list_projects.side_effect = [
+            ["remote-project"],
+            [],
+        ]
+        mock_shesha.get_project_info.return_value = ProjectInfo(
+            "remote-project", "https://github.com/org/repo", False, True
+        )
+
+        # Track all input prompts
+        prompts: list[str] = []
+
+        def mock_input(prompt: str) -> str:
+            prompts.append(prompt)
+            if "d<N>" in prompt:
+                return "d1"
+            return "y"
+
+        monkeypatch.setattr("builtins.input", mock_input)
+
+        show_picker(mock_shesha)
+
+        # Remote projects should mention "cloned repository"
+        confirmation_prompt = prompts[1]  # Second prompt is the confirmation
+        assert "cloned repository" in confirmation_prompt

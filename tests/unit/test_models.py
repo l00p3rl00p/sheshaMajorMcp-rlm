@@ -4,7 +4,36 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from shesha.models import RepoProjectResult
+from shesha.models import ProjectInfo, QueryContext, RepoProjectResult
+
+
+class TestProjectInfo:
+    """Tests for ProjectInfo dataclass."""
+
+    def test_project_info_dataclass(self):
+        """ProjectInfo stores project metadata correctly."""
+        info = ProjectInfo(
+            project_id="my-project",
+            source_url="https://github.com/org/repo",
+            is_local=False,
+            source_exists=True,
+        )
+
+        assert info.project_id == "my-project"
+        assert info.source_url == "https://github.com/org/repo"
+        assert info.is_local is False
+        assert info.source_exists is True
+
+    def test_project_info_with_none_source(self):
+        """ProjectInfo handles None source_url for non-repo projects."""
+        info = ProjectInfo(
+            project_id="manual-project",
+            source_url=None,
+            is_local=False,
+            source_exists=True,
+        )
+
+        assert info.source_url is None
 
 
 class TestRepoProjectResult:
@@ -92,3 +121,24 @@ class TestRepoProjectResult:
 
         with pytest.raises(ValueError, match="only valid when status is 'updates_available'"):
             result.apply_updates()
+
+
+class TestQueryContext:
+    """Tests for QueryContext dataclass."""
+
+    def test_query_context_stores_metadata(self) -> None:
+        """QueryContext stores all query metadata."""
+        ctx = QueryContext(
+            trace_id="abc123",
+            question="What is X?",
+            document_ids=["doc1", "doc2"],
+            model="claude-sonnet-4-20250514",
+            system_prompt="You are an assistant...",
+            subcall_prompt="Analyze this...",
+        )
+        assert ctx.trace_id == "abc123"
+        assert ctx.question == "What is X?"
+        assert ctx.document_ids == ["doc1", "doc2"]
+        assert ctx.model == "claude-sonnet-4-20250514"
+        assert ctx.system_prompt == "You are an assistant..."
+        assert ctx.subcall_prompt == "Analyze this..."

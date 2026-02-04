@@ -9,6 +9,16 @@ if TYPE_CHECKING:
 
 
 @dataclass
+class ProjectInfo:
+    """Metadata about a project's source."""
+
+    project_id: str
+    source_url: str | None
+    is_local: bool
+    source_exists: bool
+
+
+@dataclass
 class ParsedDocument:
     """A parsed document ready for storage and querying."""
 
@@ -38,3 +48,15 @@ class RepoProjectResult:
         if self._apply_updates_fn is None:
             raise ValueError("No apply_updates function provided")
         return self._apply_updates_fn()
+
+
+@dataclass
+class QueryContext:
+    """Metadata about a query for trace logging."""
+
+    trace_id: str
+    question: str
+    document_ids: list[str]
+    model: str
+    system_prompt: str
+    subcall_prompt: str

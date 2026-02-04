@@ -192,6 +192,42 @@ class TestSHATracking:
         sha = ingester.get_saved_sha("nonexistent-project")
         assert sha is None
 
+    def test_get_repo_url(self, ingester: RepoIngester, tmp_path: Path):
+        """get_repo_url() returns git remote origin URL."""
+        repo_path = tmp_path / "repos" / "my-project"
+        repo_path.mkdir(parents=True)
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0,
+                stdout="https://github.com/org/repo\n",
+            )
+
+            url = ingester.get_repo_url("my-project")
+            assert url == "https://github.com/org/repo"
+            assert "remote" in mock_run.call_args[0][0]
+            assert "get-url" in mock_run.call_args[0][0]
+
+    def test_get_repo_url_returns_none_when_no_repo(self, ingester: RepoIngester):
+        """get_repo_url() returns None when repo directory doesn't exist."""
+        url = ingester.get_repo_url("nonexistent-project")
+        assert url is None
+
+    def test_get_repo_url_returns_none_when_no_remote(self, ingester: RepoIngester, tmp_path: Path):
+        """get_repo_url() returns None when git remote fails."""
+        repo_path = tmp_path / "repos" / "my-project"
+        repo_path.mkdir(parents=True)
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=1,
+                stdout="",
+                stderr="fatal: No such remote 'origin'",
+            )
+
+            url = ingester.get_repo_url("my-project")
+            assert url is None
+
     def test_get_remote_sha(self, ingester: RepoIngester):
         """get_remote_sha() calls git ls-remote."""
         with patch("subprocess.run") as mock_run:
@@ -262,6 +298,54 @@ class TestFileListing:
 
             files = ingester.list_files("my-project")
             assert files == []
+
+
+class TestSourceURLTracking:
+    """Tests for source URL tracking functionality."""
+
+    def test_save_source_url_stores_url(self, tmp_path: Path):
+        """save_source_url stores the original source URL in metadata."""
+        ingester = RepoIngester(tmp_path)
+
+        ingester.save_source_url("my-project", "https://github.com/org/repo")
+
+        assert ingester.get_source_url("my-project") == "https://github.com/org/repo"
+
+    def test_save_source_url_stores_local_path(self, tmp_path: Path):
+        """save_source_url stores local paths correctly."""
+        ingester = RepoIngester(tmp_path)
+
+        ingester.save_source_url("local-project", "/path/to/local/repo")
+
+        assert ingester.get_source_url("local-project") == "/path/to/local/repo"
+
+    def test_get_source_url_returns_none_when_not_set(self, tmp_path: Path):
+        """get_source_url returns None when no URL has been saved."""
+        ingester = RepoIngester(tmp_path)
+
+        assert ingester.get_source_url("nonexistent") is None
+
+
+class TestDeleteRepo:
+    """Tests for delete_repo functionality."""
+
+    def test_delete_repo_removes_cloned_directory(self, tmp_path: Path):
+        """delete_repo removes the cloned repository directory."""
+        ingester = RepoIngester(tmp_path)
+        repo_path = ingester.repos_dir / "my-project"
+        repo_path.mkdir(parents=True)
+        (repo_path / "file.txt").write_text("content")
+
+        ingester.delete_repo("my-project")
+
+        assert not repo_path.exists()
+
+    def test_delete_repo_does_nothing_for_nonexistent(self, tmp_path: Path):
+        """delete_repo silently succeeds for non-existent repos."""
+        ingester = RepoIngester(tmp_path)
+
+        # Should not raise
+        ingester.delete_repo("nonexistent")
 
 
 class TestGitFetchPull:
