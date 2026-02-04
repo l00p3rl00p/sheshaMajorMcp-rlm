@@ -116,3 +116,35 @@ class TestProject:
         assert call_kwargs.get("documents") == ["doc content"]
         assert call_kwargs.get("doc_names") == ["doc.txt"]
         assert call_kwargs.get("question") == "test question"
+
+    def test_query_passes_storage_and_project_id_for_tracing(
+        self, mock_storage: MagicMock, mock_registry: MagicMock
+    ):
+        """Query passes storage and project_id to engine for trace writing."""
+        mock_engine = MagicMock()
+        mock_engine.query.return_value = MagicMock(answer="test answer")
+
+        mock_storage.load_all_documents.return_value = [
+            ParsedDocument(
+                name="doc.txt",
+                content="doc content",
+                format="txt",
+                metadata={},
+                char_count=11,
+                parse_warnings=[],
+            )
+        ]
+
+        project = Project(
+            project_id="test-project",
+            storage=mock_storage,
+            parser_registry=mock_registry,
+            rlm_engine=mock_engine,
+        )
+
+        project.query("test question")
+
+        # Verify storage and project_id are passed for trace writing
+        call_kwargs = mock_engine.query.call_args.kwargs
+        assert call_kwargs.get("storage") is mock_storage
+        assert call_kwargs.get("project_id") == "test-project"

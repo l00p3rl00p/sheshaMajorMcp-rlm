@@ -68,4 +68,6 @@ class Project:
             question=question,
             doc_names=[d.name for d in docs],
             on_progress=on_progress,
+            storage=self._storage,
+            project_id=self.project_id,
         )
