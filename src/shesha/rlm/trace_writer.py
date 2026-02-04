@@ -1,6 +1,7 @@
 """Trace writer for saving query traces to JSONL files."""
 
 import datetime
+import json
 from pathlib import Path
 
 from shesha.models import QueryContext
@@ -47,7 +48,24 @@ class TraceWriter:
         short_id = context.trace_id[:8]
         filename = f"{timestamp}_{short_id}.jsonl"
 
+        # Build lines
+        lines: list[str] = []
+
+        # Header
+        header = {
+            "type": "header",
+            "trace_id": context.trace_id,
+            "timestamp": now.isoformat(),
+            "question": context.question,
+            "document_ids": context.document_ids,
+            "model": context.model,
+            "system_prompt": context.system_prompt,
+            "subcall_prompt": context.subcall_prompt,
+        }
+        lines.append(json.dumps(header))
+
+        # Write file
         path = traces_dir / filename
-        path.write_text("")  # Create empty file for now
+        path.write_text("\n".join(lines) + "\n")
 
         return path

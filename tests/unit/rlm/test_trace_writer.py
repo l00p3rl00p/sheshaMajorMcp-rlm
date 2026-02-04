@@ -1,6 +1,7 @@
 """Tests for trace writer."""
 
 import datetime
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -72,3 +73,66 @@ class TestTraceWriterFileCreation:
         # Check filename format: YYYY-MM-DDTHH-MM-SS-mmm_shortid.jsonl
         assert "2026-02-03T14-30-00-123" in path.name
         assert "abcd1234" in path.name
+
+
+class TestTraceWriterContent:
+    """Tests for trace file content."""
+
+    @pytest.fixture
+    def storage(self, tmp_path: Path) -> FilesystemStorage:
+        """Create a temporary storage backend."""
+        storage = FilesystemStorage(root_path=tmp_path)
+        storage.create_project("test-project")
+        return storage
+
+    @pytest.fixture
+    def trace(self) -> Trace:
+        """Create a sample trace."""
+        trace = Trace()
+        trace.add_step(StepType.CODE_GENERATED, "print('hello')", iteration=0)
+        trace.add_step(StepType.CODE_OUTPUT, "hello", iteration=0)
+        return trace
+
+    @pytest.fixture
+    def context(self) -> QueryContext:
+        """Create a sample query context."""
+        return QueryContext(
+            trace_id="abcd1234-5678-90ab-cdef-1234567890ab",
+            question="What is the answer?",
+            document_ids=["doc1", "doc2"],
+            model="claude-sonnet-4-20250514",
+            system_prompt="You are an assistant...",
+            subcall_prompt="Analyze this...",
+        )
+
+    def test_trace_file_contains_header_with_metadata(
+        self,
+        storage: FilesystemStorage,
+        trace: Trace,
+        context: QueryContext,
+    ) -> None:
+        """First line of trace file is header with query metadata."""
+        from shesha.rlm.trace_writer import TraceWriter
+
+        writer = TraceWriter(storage)
+        path = writer.write_trace(
+            project_id="test-project",
+            trace=trace,
+            context=context,
+            answer="42",
+            token_usage=TokenUsage(prompt_tokens=100, completion_tokens=50),
+            execution_time=1.5,
+            status="success",
+        )
+
+        lines = path.read_text().strip().split("\n")
+        header = json.loads(lines[0])
+
+        assert header["type"] == "header"
+        assert header["trace_id"] == "abcd1234-5678-90ab-cdef-1234567890ab"
+        assert header["question"] == "What is the answer?"
+        assert header["document_ids"] == ["doc1", "doc2"]
+        assert header["model"] == "claude-sonnet-4-20250514"
+        assert header["system_prompt"] == "You are an assistant..."
+        assert header["subcall_prompt"] == "Analyze this..."
+        assert "timestamp" in header
