@@ -9,6 +9,16 @@ if TYPE_CHECKING:
 
 
 @dataclass
+class ProjectInfo:
+    """Metadata about a project's source."""
+
+    project_id: str
+    source_url: str | None
+    is_local: bool
+    source_exists: bool
+
+
+@dataclass
 class ParsedDocument:
     """A parsed document ready for storage and querying."""
 

@@ -4,7 +4,36 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from shesha.models import QueryContext, RepoProjectResult
+from shesha.models import ProjectInfo, QueryContext, RepoProjectResult
+
+
+class TestProjectInfo:
+    """Tests for ProjectInfo dataclass."""
+
+    def test_project_info_dataclass(self):
+        """ProjectInfo stores project metadata correctly."""
+        info = ProjectInfo(
+            project_id="my-project",
+            source_url="https://github.com/org/repo",
+            is_local=False,
+            source_exists=True,
+        )
+
+        assert info.project_id == "my-project"
+        assert info.source_url == "https://github.com/org/repo"
+        assert info.is_local is False
+        assert info.source_exists is True
+
+    def test_project_info_with_none_source(self):
+        """ProjectInfo handles None source_url for non-repo projects."""
+        info = ProjectInfo(
+            project_id="manual-project",
+            source_url=None,
+            is_local=False,
+            source_exists=True,
+        )
+
+        assert info.source_url is None
 
 
 class TestRepoProjectResult:
