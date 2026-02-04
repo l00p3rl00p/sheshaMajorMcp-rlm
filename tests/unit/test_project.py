@@ -144,7 +144,44 @@ class TestProject:
 
         project.query("test question")
 
-        # Verify storage and project_id are passed for trace writing
+        # Non-FilesystemStorage results in None being passed (tracing disabled)
         call_kwargs = mock_engine.query.call_args.kwargs
-        assert call_kwargs.get("storage") is mock_storage
+        assert call_kwargs.get("storage") is None
+        assert call_kwargs.get("project_id") == "test-project"
+
+    def test_query_passes_filesystem_storage_for_tracing(
+        self, mock_registry: MagicMock
+    ):
+        """Query passes FilesystemStorage to engine for trace writing."""
+        from shesha.storage.filesystem import FilesystemStorage
+        from unittest.mock import create_autospec
+
+        mock_engine = MagicMock()
+        mock_engine.query.return_value = MagicMock(answer="test answer")
+
+        # Use autospec to create a mock that passes isinstance check
+        fs_storage = create_autospec(FilesystemStorage, instance=True)
+        fs_storage.load_all_documents.return_value = [
+            ParsedDocument(
+                name="doc.txt",
+                content="doc content",
+                format="txt",
+                metadata={},
+                char_count=11,
+                parse_warnings=[],
+            )
+        ]
+
+        project = Project(
+            project_id="test-project",
+            storage=fs_storage,
+            parser_registry=mock_registry,
+            rlm_engine=mock_engine,
+        )
+
+        project.query("test question")
+
+        # FilesystemStorage should be passed for trace writing
+        call_kwargs = mock_engine.query.call_args.kwargs
+        assert call_kwargs.get("storage") is fs_storage
         assert call_kwargs.get("project_id") == "test-project"
