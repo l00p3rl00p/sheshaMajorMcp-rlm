@@ -300,6 +300,32 @@ class TestFileListing:
             assert files == []
 
 
+class TestSourceURLTracking:
+    """Tests for source URL tracking functionality."""
+
+    def test_save_source_url_stores_url(self, tmp_path: Path):
+        """save_source_url stores the original source URL in metadata."""
+        ingester = RepoIngester(tmp_path)
+
+        ingester.save_source_url("my-project", "https://github.com/org/repo")
+
+        assert ingester.get_source_url("my-project") == "https://github.com/org/repo"
+
+    def test_save_source_url_stores_local_path(self, tmp_path: Path):
+        """save_source_url stores local paths correctly."""
+        ingester = RepoIngester(tmp_path)
+
+        ingester.save_source_url("local-project", "/path/to/local/repo")
+
+        assert ingester.get_source_url("local-project") == "/path/to/local/repo"
+
+    def test_get_source_url_returns_none_when_not_set(self, tmp_path: Path):
+        """get_source_url returns None when no URL has been saved."""
+        ingester = RepoIngester(tmp_path)
+
+        assert ingester.get_source_url("nonexistent") is None
+
+
 class TestGitFetchPull:
     """Tests for git fetch and pull functionality."""
 
