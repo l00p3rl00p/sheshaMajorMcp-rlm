@@ -31,6 +31,9 @@ class SheshaConfig:
     max_iterations: int = 20
     max_output_chars: int = 50000
 
+    # Trace logging
+    max_traces_per_project: int = 50
+
     # Network whitelist for containers
     allowed_hosts: list[str] = field(
         default_factory=lambda: [
@@ -90,11 +93,12 @@ class SheshaConfig:
             "SHESHA_STORAGE_PATH": "storage_path",
             "SHESHA_POOL_SIZE": "pool_size",
             "SHESHA_MAX_ITERATIONS": "max_iterations",
+            "SHESHA_MAX_TRACES_PER_PROJECT": "max_traces_per_project",
         }
         for env_var, field_name in env_map.items():
             if env_var in os.environ:
                 env_val: Any = os.environ[env_var]
-                if field_name in {"pool_size", "max_iterations"}:
+                if field_name in {"pool_size", "max_iterations", "max_traces_per_project"}:
                     env_val = int(env_val)
                 config_dict[field_name] = env_val
 
