@@ -410,3 +410,18 @@ class TestPathTraversalProtection:
         """_repo_path raises PathTraversalError on absolute path."""
         with pytest.raises(PathTraversalError):
             ingester._repo_path("/etc/passwd")
+
+    def test_clone_blocks_traversal(self, ingester: RepoIngester):
+        """clone() raises PathTraversalError on traversal attempt."""
+        with pytest.raises(PathTraversalError):
+            ingester.clone("https://github.com/org/repo", "../escape")
+
+    def test_save_sha_blocks_traversal(self, ingester: RepoIngester):
+        """save_sha() raises PathTraversalError on traversal attempt."""
+        with pytest.raises(PathTraversalError):
+            ingester.save_sha("../escape", "abc123")
+
+    def test_delete_repo_blocks_traversal(self, ingester: RepoIngester):
+        """delete_repo() raises PathTraversalError on traversal attempt."""
+        with pytest.raises(PathTraversalError):
+            ingester.delete_repo("../escape")
