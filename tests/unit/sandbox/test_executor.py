@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from shesha.sandbox.executor import ContainerExecutor, ExecutionResult
+from shesha.security.containers import ContainerSecurityConfig
 
 
 class TestProtocolError:
@@ -39,9 +40,6 @@ class TestProtocolLimits:
         from shesha.sandbox.executor import MAX_READ_DURATION
 
         assert MAX_READ_DURATION == 300  # 5 minutes
-
-
-from shesha.security.containers import ContainerSecurityConfig
 
 
 def make_docker_frame(data: bytes, stream_type: int = 1) -> bytes:
@@ -469,8 +467,8 @@ class TestLineLengthLimit:
     def test_read_line_raises_on_oversized_line(self):
         """_read_line raises ProtocolError when line exceeds MAX_LINE_LENGTH."""
         from shesha.sandbox.executor import (
-            ContainerExecutor,
             MAX_LINE_LENGTH,
+            ContainerExecutor,
             ProtocolError,
         )
 
@@ -546,7 +544,9 @@ class TestReadDeadline:
             with pytest.raises(ProtocolError) as exc_info:
                 executor._read_line(timeout=5)
 
-        assert "duration" in str(exc_info.value).lower() or "deadline" in str(exc_info.value).lower()
+        assert (
+            "duration" in str(exc_info.value).lower() or "deadline" in str(exc_info.value).lower()
+        )
 
 
 class TestExecuteProtocolHandling:
