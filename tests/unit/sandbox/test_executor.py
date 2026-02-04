@@ -547,3 +547,22 @@ class TestReadDeadline:
                 executor._read_line(timeout=5)
 
         assert "duration" in str(exc_info.value).lower() or "deadline" in str(exc_info.value).lower()
+
+
+class TestExecuteProtocolHandling:
+    """Tests for ProtocolError handling in execute()."""
+
+    def test_execute_returns_error_result_on_protocol_error(self):
+        """execute() returns error ExecutionResult when ProtocolError occurs."""
+        from shesha.sandbox.executor import ContainerExecutor, ProtocolError
+
+        executor = ContainerExecutor()
+        executor._socket = MagicMock()
+
+        # Mock _read_line to raise ProtocolError
+        with patch.object(executor, "_read_line", side_effect=ProtocolError("buffer overflow")):
+            with patch.object(executor, "_send_raw"):
+                result = executor.execute("print('hello')")
+
+        assert result.status == "error"
+        assert "protocol" in result.error.lower() or "buffer" in result.error.lower()

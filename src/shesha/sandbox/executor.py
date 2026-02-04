@@ -119,51 +119,60 @@ class ContainerExecutor:
         """Execute code in the container, handling llm_query callbacks."""
         self._send_raw(json.dumps({"action": "execute", "code": code}) + "\n")
 
-        # Handle responses, which may include llm_query requests
-        while True:
-            response_line = self._read_line(timeout=timeout)
-            result = json.loads(response_line)
+        try:
+            # Handle responses, which may include llm_query requests
+            while True:
+                response_line = self._read_line(timeout=timeout)
+                result = json.loads(response_line)
 
-            # Check if this is an llm_query request
-            if result.get("action") == "llm_query":
-                if self.llm_query_handler is None:
-                    # No handler - send error back
-                    self._send_raw(
-                        json.dumps(
-                            {
-                                "action": "llm_response",
-                                "result": "ERROR: No LLM query handler configured",
-                            }
+                # Check if this is an llm_query request
+                if result.get("action") == "llm_query":
+                    if self.llm_query_handler is None:
+                        # No handler - send error back
+                        self._send_raw(
+                            json.dumps(
+                                {
+                                    "action": "llm_response",
+                                    "result": "ERROR: No LLM query handler configured",
+                                }
+                            )
+                            + "\n"
                         )
-                        + "\n"
-                    )
-                else:
-                    # Call handler and send response back
-                    llm_response = self.llm_query_handler(
-                        result["instruction"],
-                        result["content"],
-                    )
-                    self._send_raw(
-                        json.dumps(
-                            {
-                                "action": "llm_response",
-                                "result": llm_response,
-                            }
+                    else:
+                        # Call handler and send response back
+                        llm_response = self.llm_query_handler(
+                            result["instruction"],
+                            result["content"],
                         )
-                        + "\n"
-                    )
-                continue
+                        self._send_raw(
+                            json.dumps(
+                                {
+                                    "action": "llm_response",
+                                    "result": llm_response,
+                                }
+                            )
+                            + "\n"
+                        )
+                    continue
 
-            # This is the final execution result
+                # This is the final execution result
+                return ExecutionResult(
+                    status=result.get("status", "error"),
+                    stdout=result.get("stdout", ""),
+                    stderr=result.get("stderr", ""),
+                    return_value=result.get("return_value"),
+                    error=result.get("error"),
+                    final_answer=result.get("final_answer"),
+                    final_var=result.get("final_var"),
+                    final_value=result.get("final_value"),
+                )
+        except ProtocolError as e:
             return ExecutionResult(
-                status=result.get("status", "error"),
-                stdout=result.get("stdout", ""),
-                stderr=result.get("stderr", ""),
-                return_value=result.get("return_value"),
-                error=result.get("error"),
-                final_answer=result.get("final_answer"),
-                final_var=result.get("final_var"),
-                final_value=result.get("final_value"),
+                status="error",
+                stdout="",
+                stderr="",
+                return_value=None,
+                error=f"Protocol error: {e}",
             )
 
     def _send_raw(self, data: str) -> None:
