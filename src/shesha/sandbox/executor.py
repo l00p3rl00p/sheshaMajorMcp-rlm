@@ -167,6 +167,9 @@ class ContainerExecutor:
                     final_value=result.get("final_value"),
                 )
         except ProtocolError as e:
+            # Protocol violation implies potentially malicious/broken container state.
+            # Terminate it to prevent reuse of compromised container.
+            self.stop()
             return ExecutionResult(
                 status="error",
                 stdout="",

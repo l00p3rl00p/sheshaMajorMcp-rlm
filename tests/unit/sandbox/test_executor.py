@@ -566,3 +566,19 @@ class TestExecuteProtocolHandling:
 
         assert result.status == "error"
         assert "protocol" in result.error.lower() or "buffer" in result.error.lower()
+
+    def test_execute_stops_container_on_protocol_error(self):
+        """execute() stops the container when ProtocolError occurs."""
+        from shesha.sandbox.executor import ContainerExecutor, ProtocolError
+
+        executor = ContainerExecutor()
+        executor._socket = MagicMock()
+
+        # Mock _read_line to raise ProtocolError and track stop() call
+        with patch.object(executor, "_read_line", side_effect=ProtocolError("malicious data")):
+            with patch.object(executor, "_send_raw"):
+                with patch.object(executor, "stop") as mock_stop:
+                    executor.execute("print('hello')")
+
+        # Container should be stopped after protocol violation
+        mock_stop.assert_called_once()
