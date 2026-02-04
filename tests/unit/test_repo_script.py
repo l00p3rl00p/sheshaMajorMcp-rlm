@@ -392,3 +392,21 @@ class TestMain:
         # Should use create_project_from_repo for new URL, NOT get_project
         mock_shesha.create_project_from_repo.assert_called_once_with("https://github.com/new/repo")
         mock_shesha.get_project.assert_not_called()
+
+    def test_show_picker_shows_missing_marker(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """show_picker marks projects with missing local repos."""
+        from examples.repo import show_picker
+        from shesha import ProjectInfo
+
+        mock_shesha = MagicMock()
+        mock_shesha.list_projects.return_value = ["remote-repo", "missing-local"]
+        mock_shesha.get_project_info.side_effect = [
+            ProjectInfo("remote-repo", "https://github.com/org/repo", False, True),
+            ProjectInfo("missing-local", "/old/path", True, False),
+        ]
+
+        with patch("builtins.input", return_value="1"):
+            show_picker(mock_shesha)
+
+        captured = capsys.readouterr()
+        assert "missing-local (missing - /old/path)" in captured.out

@@ -120,7 +120,8 @@ def show_picker(shesha: Shesha) -> tuple[str, bool] | None:
     """Show interactive repository picker for previously indexed repos.
 
     Displays a numbered list of previously indexed repositories and prompts
-    the user to either select one by number or enter a new URL/path.
+    the user to either select one by number, delete one with 'd<N>', or
+    enter a new URL/path.
 
     Args:
         shesha: Initialized Shesha instance to query for existing projects.
@@ -133,12 +134,12 @@ def show_picker(shesha: Shesha) -> tuple[str, bool] | None:
     Example:
         Available repositories:
           1. org-repo
-          2. another-project
+          2. another-project (missing - /old/path)
 
-        Enter number or new repo URL: 1
+        Enter number, 'd<N>' to delete, or new URL: 1
         -> Returns ("org-repo", True)
 
-        Enter number or new repo URL: https://github.com/new/repo
+        Enter number, 'd<N>' to delete, or new URL: https://github.com/new/repo
         -> Returns ("https://github.com/new/repo", False)
     """
     projects = shesha.list_projects()
@@ -147,10 +148,14 @@ def show_picker(shesha: Shesha) -> tuple[str, bool] | None:
 
     print("Available repositories:")
     for i, name in enumerate(projects, 1):
-        print(f"  {i}. {name}")
+        info = shesha.get_project_info(name)
+        if info.is_local and not info.source_exists:
+            print(f"  {i}. {name} (missing - {info.source_url})")
+        else:
+            print(f"  {i}. {name}")
     print()
 
-    user_input = input("Enter number or new repo URL: ").strip()
+    user_input = input("Enter number, 'd<N>' to delete, or new URL: ").strip()
 
     # Check if it's a number selecting an existing project
     try:
