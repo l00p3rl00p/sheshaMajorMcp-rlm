@@ -54,9 +54,7 @@ class TestRepoIngester:
         """detect_host returns None for local paths."""
         assert ingester.detect_host("/home/user/repo") is None
 
-    def test_is_git_repo_returns_true_for_git_dir(
-        self, ingester: RepoIngester, tmp_path: Path
-    ):
+    def test_is_git_repo_returns_true_for_git_dir(self, ingester: RepoIngester, tmp_path: Path):
         """is_git_repo returns True for directories with .git."""
         repo_dir = tmp_path / "my-repo"
         repo_dir.mkdir()

@@ -326,9 +326,7 @@ class Shesha:
         if self._repo_ingester.is_local_path(url):
             local_path = Path(url).expanduser()
             if not self._repo_ingester.is_git_repo(local_path):
-                raise RepoIngestError(
-                    url, RuntimeError(f"'{url}' is not a git repository")
-                )
+                raise RepoIngestError(url, RuntimeError(f"'{url}' is not a git repository"))
         else:
             self._repo_ingester.clone(url, name, token)
         return self._ingest_repo(url, name, token, path, is_update=False)

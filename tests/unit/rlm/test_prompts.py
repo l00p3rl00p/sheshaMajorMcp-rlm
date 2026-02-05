@@ -14,11 +14,13 @@ def test_system_prompt_contains_security_warning():
     """System prompt contains prompt injection warning."""
     loader = PromptLoader()
 
-    doc_sizes_list = _build_doc_sizes_list([
-        ("a.txt", "3,000 chars"),
-        ("b.txt", "3,500 chars"),
-        ("c.txt", "3,500 chars"),
-    ])
+    doc_sizes_list = _build_doc_sizes_list(
+        [
+            ("a.txt", "3,000 chars"),
+            ("b.txt", "3,500 chars"),
+            ("c.txt", "3,500 chars"),
+        ]
+    )
 
     prompt = loader.render_system_prompt(
         doc_count=3,
@@ -34,11 +36,13 @@ def test_system_prompt_contains_context_info():
     """System prompt contains context information."""
     loader = PromptLoader()
 
-    doc_sizes_list = _build_doc_sizes_list([
-        ("a.txt", "3,000 chars"),
-        ("b.txt", "3,500 chars"),
-        ("c.txt", "3,500 chars"),
-    ])
+    doc_sizes_list = _build_doc_sizes_list(
+        [
+            ("a.txt", "3,000 chars"),
+            ("b.txt", "3,500 chars"),
+            ("c.txt", "3,500 chars"),
+        ]
+    )
 
     prompt = loader.render_system_prompt(
         doc_count=3,
@@ -83,11 +87,13 @@ def test_system_prompt_contains_sub_llm_limit():
     """System prompt tells LLM about sub-LLM character limit."""
     loader = PromptLoader()
 
-    doc_sizes_list = _build_doc_sizes_list([
-        ("a.txt", "30,000 chars"),
-        ("b.txt", "35,000 chars"),
-        ("c.txt", "35,000 chars"),
-    ])
+    doc_sizes_list = _build_doc_sizes_list(
+        [
+            ("a.txt", "30,000 chars"),
+            ("b.txt", "35,000 chars"),
+            ("c.txt", "35,000 chars"),
+        ]
+    )
 
     prompt = loader.render_system_prompt(
         doc_count=3,
@@ -103,11 +109,13 @@ def test_system_prompt_contains_chunking_guidance():
     """System prompt explains chunking strategy for large documents."""
     loader = PromptLoader()
 
-    doc_sizes_list = _build_doc_sizes_list([
-        ("a.txt", "30,000 chars"),
-        ("b.txt", "35,000 chars"),
-        ("c.txt", "35,000 chars"),
-    ])
+    doc_sizes_list = _build_doc_sizes_list(
+        [
+            ("a.txt", "30,000 chars"),
+            ("b.txt", "35,000 chars"),
+            ("c.txt", "35,000 chars"),
+        ]
+    )
 
     prompt = loader.render_system_prompt(
         doc_count=3,
@@ -141,11 +149,13 @@ def test_system_prompt_requires_document_grounding():
     """System prompt instructs LLM to answer only from documents, not own knowledge."""
     loader = PromptLoader()
 
-    doc_sizes_list = _build_doc_sizes_list([
-        ("a.txt", "3,000 chars"),
-        ("b.txt", "3,500 chars"),
-        ("c.txt", "3,500 chars"),
-    ])
+    doc_sizes_list = _build_doc_sizes_list(
+        [
+            ("a.txt", "3,000 chars"),
+            ("b.txt", "3,500 chars"),
+            ("c.txt", "3,500 chars"),
+        ]
+    )
 
     prompt = loader.render_system_prompt(
         doc_count=3,
@@ -169,11 +179,13 @@ def test_system_prompt_includes_per_document_sizes():
     """System prompt shows size of each document when doc_sizes provided."""
     loader = PromptLoader()
 
-    doc_sizes_list = _build_doc_sizes_list([
-        ("a.txt", "5,000 chars"),
-        ("b.txt", "4,000 chars"),
-        ("c.txt", "6,000 chars"),
-    ])
+    doc_sizes_list = _build_doc_sizes_list(
+        [
+            ("a.txt", "5,000 chars"),
+            ("b.txt", "4,000 chars"),
+            ("c.txt", "6,000 chars"),
+        ]
+    )
 
     prompt = loader.render_system_prompt(
         doc_count=3,
@@ -195,10 +207,12 @@ def test_system_prompt_warns_about_oversized_documents():
     loader = PromptLoader()
 
     oversized = MAX_SUBCALL_CHARS + 10000  # Slightly over limit
-    doc_sizes_list = _build_doc_sizes_list([
-        ("small.txt", "100,000 chars"),
-        ("large.txt", f"{oversized:,} chars EXCEEDS LIMIT - must chunk"),
-    ])
+    doc_sizes_list = _build_doc_sizes_list(
+        [
+            ("small.txt", "100,000 chars"),
+            ("large.txt", f"{oversized:,} chars EXCEEDS LIMIT - must chunk"),
+        ]
+    )
 
     prompt = loader.render_system_prompt(
         doc_count=2,
