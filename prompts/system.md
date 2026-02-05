@@ -37,7 +37,7 @@ When a document exceeds {max_subcall_chars:,} characters, you MUST chunk it:
 doc = context[0]
 chunk_size = 400000  # Leave margin under the {max_subcall_chars:,} limit
 chunks = [doc[i:i+chunk_size] for i in range(0, len(doc), chunk_size)]
-print(f"Split into {len(chunks)} chunks")
+print(f"Split into {{len(chunks)}} chunks")
 ```
 
 ## Buffer Pattern for Complex Questions
@@ -53,7 +53,7 @@ for i, doc in enumerate(context):
     matches = re.findall(r'[^.]*Carthoris[^.]*\.', doc)
     if matches:
         relevant_chunks.append((i, "\n".join(matches[:50])))  # Limit matches
-        print(f"Doc {i}: found {len(matches)} mentions")
+        print(f"Doc {{i}}: found {{len(matches)}} mentions")
 ```
 
 ```repl
@@ -66,8 +66,8 @@ for doc_idx, chunk in relevant_chunks:
         instruction="List key events involving this character with brief quotes.",
         content=chunk
     )
-    findings.append(f"From doc {doc_idx}: {result}")
-    print(f"Analyzed doc {doc_idx}")
+    findings.append(f"From doc {{doc_idx}}: {{result}}")
+    print(f"Analyzed doc {{doc_idx}}")
 ```
 
 ```repl
