@@ -1,5 +1,6 @@
 """Tests for MultiRepoAnalyzer."""
 
+import json
 from unittest.mock import MagicMock
 
 from shesha.experimental.multi_repo import MultiRepoAnalyzer
@@ -94,9 +95,7 @@ class TestMultiRepoAnalyzerAddRepo:
 
         assert project_id == "org-repo"
         assert "org-repo" in analyzer.repos
-        mock_shesha.create_project_from_repo.assert_called_once_with(
-            "https://github.com/org/repo"
-        )
+        mock_shesha.create_project_from_repo.assert_called_once_with("https://github.com/org/repo")
 
     def test_add_repo_reuses_existing(self):
         """add_repo reuses existing project if unchanged."""
@@ -143,3 +142,57 @@ class TestMultiRepoAnalyzerAddRepo:
         analyzer.add_repo("https://github.com/org/repo")
 
         assert analyzer.repos.count("org-repo") == 1
+
+
+class TestMultiRepoAnalyzerRecon:
+    """Tests for Phase 1 recon."""
+
+    def test_run_recon_queries_project(self):
+        """Recon phase queries the project with recon prompt."""
+        mock_shesha = MagicMock()
+        mock_project = MagicMock()
+        mock_project.project_id = "test-repo"
+        mock_query_result = MagicMock()
+        mock_query_result.answer = (
+            json.dumps(
+                {
+                    "apis": ["GET /users"],
+                    "models": ["User"],
+                    "entry_points": ["main.py"],
+                    "dependencies": ["postgres"],
+                }
+            )
+            + "\n\nThis is a user service."
+        )
+        mock_project.query.return_value = mock_query_result
+        mock_shesha.get_project.return_value = mock_project
+
+        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer._repos = ["test-repo"]
+
+        summary = analyzer._run_recon("test-repo")
+
+        assert summary.project_id == "test-repo"
+        assert "GET /users" in summary.apis
+        assert "User" in summary.models
+        mock_project.query.assert_called_once()
+
+    def test_run_recon_handles_malformed_json(self):
+        """Recon gracefully handles non-JSON responses."""
+        mock_shesha = MagicMock()
+        mock_project = MagicMock()
+        mock_project.project_id = "test-repo"
+        mock_query_result = MagicMock()
+        mock_query_result.answer = "This repo contains user management code."
+        mock_project.query.return_value = mock_query_result
+        mock_shesha.get_project.return_value = mock_project
+
+        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer._repos = ["test-repo"]
+
+        summary = analyzer._run_recon("test-repo")
+
+        assert summary.project_id == "test-repo"
+        assert summary.raw_summary == "This repo contains user management code."
+        # Lists should be empty when JSON parsing fails
+        assert summary.apis == []

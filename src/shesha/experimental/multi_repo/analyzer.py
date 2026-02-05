@@ -1,6 +1,9 @@
 """Multi-repo PRD analyzer using federated queries."""
 
-from typing import TYPE_CHECKING
+import json
+import re
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from shesha.experimental.multi_repo.models import (
     ImpactReport,
@@ -86,3 +89,64 @@ class MultiRepoAnalyzer:
             self._repos.append(project_id)
 
         return project_id
+
+    def _load_prompt(self, name: str) -> str:
+        """Load a prompt template from the prompts directory."""
+        prompts_dir = Path(__file__).parent / "prompts"
+        return (prompts_dir / f"{name}.md").read_text()
+
+    def _extract_json(self, text: str) -> dict[str, Any] | None:
+        """Extract JSON object from text that may contain markdown."""
+        # Try to find JSON in code blocks first
+        json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+        if json_match:
+            try:
+                result: dict[str, Any] = json.loads(json_match.group(1))
+                return result
+            except json.JSONDecodeError:
+                pass
+
+        # Try to find raw JSON
+        json_match = re.search(r"\{[^{}]*\}", text, re.DOTALL)
+        if json_match:
+            try:
+                result = json.loads(json_match.group(0))
+                return result
+            except json.JSONDecodeError:
+                pass
+
+        return None
+
+    def _run_recon(self, project_id: str) -> RepoSummary:
+        """Run Phase 1 recon on a single project.
+
+        Args:
+            project_id: The project to analyze.
+
+        Returns:
+            RepoSummary with extracted structure.
+        """
+        project = self._shesha.get_project(project_id)
+        prompt = self._load_prompt("recon")
+
+        result = project.query(prompt)
+        answer = result.answer
+
+        # Try to extract structured data
+        data = self._extract_json(answer)
+
+        if data:
+            return RepoSummary(
+                project_id=project_id,
+                apis=data.get("apis", []),
+                models=data.get("models", []),
+                entry_points=data.get("entry_points", []),
+                dependencies=data.get("dependencies", []),
+                raw_summary=answer,
+            )
+
+        # Fallback: return raw answer with empty lists
+        return RepoSummary(
+            project_id=project_id,
+            raw_summary=answer,
+        )
