@@ -102,6 +102,115 @@ class TestShowPicker:
         assert value == "https://github.com/new/repo"
         assert is_existing is False
 
+    def test_exit_command_returns_empty(self) -> None:
+        """Typing 'exit' should return empty string to trigger exit."""
+        from examples.repo import show_picker
+
+        mock_shesha = MagicMock()
+        mock_shesha.list_projects.return_value = ["project-a"]
+
+        with patch("builtins.input", return_value="exit"):
+            value, is_existing = show_picker(mock_shesha)
+
+        assert value == ""
+        assert is_existing is False
+
+    def test_quit_command_returns_empty(self) -> None:
+        """Typing 'quit' should return empty string to trigger exit."""
+        from examples.repo import show_picker
+
+        mock_shesha = MagicMock()
+        mock_shesha.list_projects.return_value = ["project-a"]
+
+        with patch("builtins.input", return_value="quit"):
+            value, is_existing = show_picker(mock_shesha)
+
+        assert value == ""
+        assert is_existing is False
+
+    def test_invalid_input_reprompts(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Invalid input like 'asdf' should show error and reprompt."""
+        from examples.repo import show_picker
+
+        mock_shesha = MagicMock()
+        mock_shesha.list_projects.return_value = ["project-a"]
+
+        # First input is invalid, second is valid exit
+        inputs = iter(["asdf", "exit"])
+        with patch("builtins.input", side_effect=lambda _: next(inputs)):
+            value, is_existing = show_picker(mock_shesha)
+
+        captured = capsys.readouterr()
+        assert "Invalid input" in captured.out
+        assert value == ""  # Exited on second input
+
+    def test_accepts_https_url(self) -> None:
+        """HTTPS URLs should be accepted."""
+        from examples.repo import show_picker
+
+        mock_shesha = MagicMock()
+        mock_shesha.list_projects.return_value = ["project-a"]
+
+        with patch("builtins.input", return_value="https://github.com/org/repo"):
+            value, is_existing = show_picker(mock_shesha)
+
+        assert value == "https://github.com/org/repo"
+        assert is_existing is False
+
+    def test_accepts_ssh_url(self) -> None:
+        """SSH URLs should be accepted."""
+        from examples.repo import show_picker
+
+        mock_shesha = MagicMock()
+        mock_shesha.list_projects.return_value = ["project-a"]
+
+        with patch("builtins.input", return_value="git@github.com:org/repo.git"):
+            value, is_existing = show_picker(mock_shesha)
+
+        assert value == "git@github.com:org/repo.git"
+        assert is_existing is False
+
+    def test_accepts_absolute_path(self) -> None:
+        """Absolute paths should be accepted."""
+        from examples.repo import show_picker
+
+        mock_shesha = MagicMock()
+        mock_shesha.list_projects.return_value = ["project-a"]
+
+        with patch("builtins.input", return_value="/path/to/repo"):
+            value, is_existing = show_picker(mock_shesha)
+
+        assert value == "/path/to/repo"
+        assert is_existing is False
+
+    def test_accepts_home_path(self) -> None:
+        """Paths starting with ~ should be accepted."""
+        from examples.repo import show_picker
+
+        mock_shesha = MagicMock()
+        mock_shesha.list_projects.return_value = ["project-a"]
+
+        with patch("builtins.input", return_value="~/projects/repo"):
+            value, is_existing = show_picker(mock_shesha)
+
+        assert value == "~/projects/repo"
+        assert is_existing is False
+
+    def test_accepts_relative_path(self) -> None:
+        """Paths starting with ./ or ../ should be accepted."""
+        from examples.repo import show_picker
+
+        mock_shesha = MagicMock()
+        mock_shesha.list_projects.return_value = ["project-a"]
+
+        with patch("builtins.input", return_value="./local-repo"):
+            value, is_existing = show_picker(mock_shesha)
+
+        assert value == "./local-repo"
+        assert is_existing is False
+
 
 class TestPromptForRepo:
     """Tests for prompt_for_repo function."""
@@ -533,3 +642,33 @@ class TestMain:
         # Remote projects should mention "cloned repository"
         confirmation_prompt = prompts[1]  # Second prompt is the confirmation
         assert "cloned repository" in confirmation_prompt
+
+    def test_non_git_local_path_exits_cleanly(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Non-git local path should print clean error and exit."""
+        import os
+        import sys
+
+        from examples.repo import main
+        from shesha.exceptions import RepoIngestError
+
+        mock_shesha = MagicMock()
+        mock_shesha.list_projects.return_value = []
+        mock_shesha.create_project_from_repo.side_effect = RepoIngestError(
+            "/path/to/non-git",
+            RuntimeError("'/path/to/non-git' is not a git repository"),
+        )
+
+        with patch.object(sys, "argv", ["repo.py", "/path/to/non-git"]):
+            with patch.dict(os.environ, {"SHESHA_API_KEY": "test-key"}, clear=True):
+                with patch("examples.repo.Shesha", return_value=mock_shesha):
+                    with patch("examples.repo.SheshaConfig"):
+                        with pytest.raises(SystemExit) as exc_info:
+                            main()
+
+        assert exc_info.value.code == 1
+        captured = capsys.readouterr()
+        assert "not a git repository" in captured.out
+        # Should NOT have traceback
+        assert "Traceback" not in captured.out

@@ -51,6 +51,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from shesha import Shesha, SheshaConfig
+from shesha.exceptions import RepoIngestError
 from shesha.rlm.trace import StepType
 
 # Storage path for repo projects
@@ -83,6 +84,30 @@ else:
 if TYPE_CHECKING:
     from shesha.models import RepoProjectResult
     from shesha.project import Project
+
+
+def _looks_like_repo_url_or_path(value: str) -> bool:
+    """Check if value looks like a repository URL or filesystem path.
+
+    Args:
+        value: User input string to validate.
+
+    Returns:
+        True if value looks like a URL or path, False otherwise.
+    """
+    # URLs
+    if value.startswith(("http://", "https://", "git@")):
+        return True
+    # Absolute paths
+    if value.startswith("/"):
+        return True
+    # Home-relative paths
+    if value.startswith("~"):
+        return True
+    # Relative paths
+    if value.startswith("./") or value.startswith("../"):
+        return True
+    return False
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -194,8 +219,18 @@ def show_picker(shesha: Shesha) -> tuple[str, bool] | None:
         except ValueError:
             pass  # Not a number, treat as URL/path below
 
-        # Otherwise treat as new URL/path
-        return (user_input, False)
+        # Check for exit commands
+        if is_exit_command(user_input):
+            return ("", False)
+
+        # Validate that input looks like a URL or path
+        if _looks_like_repo_url_or_path(user_input):
+            return (user_input, False)
+
+        # Invalid input - show error and reprompt
+        print(f"Invalid input: '{user_input}'")
+        print("Enter a number, 'd<N>' to delete, URL, or local path.")
+        print()
 
 
 def prompt_for_repo() -> str:
@@ -406,7 +441,11 @@ def main() -> None:
     # Load or create project from URL if not already loaded
     if project is None:
         print(f"Loading repository: {repo_url}")
-        result = shesha.create_project_from_repo(repo_url)
+        try:
+            result = shesha.create_project_from_repo(repo_url)
+        except RepoIngestError as e:
+            print(f"Error: {e}")
+            sys.exit(1)
 
         # Handle status
         if result.status == "created":
