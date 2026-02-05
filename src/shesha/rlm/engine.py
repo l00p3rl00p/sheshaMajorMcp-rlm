@@ -161,7 +161,7 @@ class RLMEngine:
                     document_ids=doc_names or [f"doc_{i}" for i in range(len(documents))],
                     model=self.model,
                     system_prompt=system_prompt,
-                    subcall_prompt=self.prompt_loader._prompts["subcall.md"],
+                    subcall_prompt=self.prompt_loader.get_raw_template("subcall.md"),
                 )
                 writer = TraceWriter(storage)
                 writer.write_trace(

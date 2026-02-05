@@ -92,3 +92,7 @@ class PromptLoader:
     def render_code_required(self) -> str:
         """Render the code_required prompt (no variables)."""
         return self._prompts["code_required.md"]
+
+    def get_raw_template(self, name: str) -> str:
+        """Get the raw template content for a prompt file."""
+        return self._prompts[name]
