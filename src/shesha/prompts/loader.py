@@ -7,10 +7,27 @@ from shesha.prompts.validator import PROMPT_SCHEMAS, validate_prompt
 
 
 def get_default_prompts_dir() -> Path:
-    """Get the default prompts directory (bundled with package)."""
-    # prompts/ is at package root, not inside src/shesha/
-    package_root = Path(__file__).parent.parent.parent.parent
-    return package_root / "prompts"
+    """Get the default prompts directory.
+
+    For development: prompts/ at project root
+    For installed package: prompts/ in package data
+    """
+    # First try: prompts/ relative to this file (installed location)
+    package_prompts = Path(__file__).parent / "prompts"
+    if package_prompts.exists():
+        return package_prompts
+
+    # Second try: prompts/ at project root (development)
+    project_root = Path(__file__).parent.parent.parent.parent
+    project_prompts = project_root / "prompts"
+    if project_prompts.exists():
+        return project_prompts
+
+    # Fallback: raise clear error
+    raise FileNotFoundError(
+        "Could not find prompts directory. "
+        "Set SHESHA_PROMPTS_DIR environment variable to specify location."
+    )
 
 
 def resolve_prompts_dir(explicit_dir: Path | None = None) -> Path:
