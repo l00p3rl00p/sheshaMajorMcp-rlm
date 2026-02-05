@@ -73,7 +73,10 @@ if __name__ == "__main__":
         format_thought_time,
         install_urllib3_cleanup_hook,
         is_exit_command,
+        is_write_command,
+        parse_write_command,
         should_warn_history_size,
+        write_session,
     )
 else:
     from .script_utils import (
@@ -84,7 +87,10 @@ else:
         format_thought_time,
         install_urllib3_cleanup_hook,
         is_exit_command,
+        is_write_command,
+        parse_write_command,
         should_warn_history_size,
+        write_session,
     )
 
 BOOKS = {
@@ -271,6 +277,20 @@ def main() -> None:
         if is_exit_command(user_input):
             print("Goodbye!")
             break
+
+        if is_write_command(user_input):
+            if not history:
+                print("Nothing to save - no exchanges yet.")
+                print()
+                continue
+            try:
+                filename = parse_write_command(user_input)
+                path = write_session(history, PROJECT_NAME, filename)
+                print(f"Session saved to {path} ({len(history)} exchanges)")
+            except OSError as e:
+                print(f"Error saving session: {e}")
+            print()
+            continue
 
         # Check if history is getting large
         if should_warn_history_size(history):
