@@ -43,3 +43,93 @@ class TestAnalysisGeneratorStructure:
         generator = AnalysisGenerator(mock_shesha)
 
         assert generator._shesha is mock_shesha
+
+
+class TestAnalysisGeneration:
+    """Tests for generate() method."""
+
+    def test_generate_returns_repo_analysis(self):
+        """generate() returns a RepoAnalysis object."""
+        from shesha.models import RepoAnalysis
+
+        # Mock the shesha instance and project
+        mock_shesha = MagicMock()
+        mock_project = MagicMock()
+        mock_shesha.get_project.return_value = mock_project
+
+        # Mock query result with valid JSON
+        mock_result = MagicMock()
+        mock_result.answer = '''
+        ```json
+        {
+          "overview": "A test application.",
+          "components": [
+            {
+              "name": "API",
+              "path": "api/",
+              "description": "REST API",
+              "apis": [{"type": "rest", "endpoints": ["/health"]}],
+              "models": ["User"],
+              "entry_points": ["api/main.py"],
+              "internal_dependencies": [],
+              "auth": null,
+              "data_persistence": null
+            }
+          ],
+          "external_dependencies": []
+        }
+        ```
+        '''
+        mock_project.query.return_value = mock_result
+
+        # Mock repo ingester for SHA
+        mock_shesha._repo_ingester.get_saved_sha.return_value = "abc123def"
+
+        generator = AnalysisGenerator(mock_shesha)
+        result = generator.generate("test-project")
+
+        assert isinstance(result, RepoAnalysis)
+        assert result.overview == "A test application."
+        assert result.head_sha == "abc123def"
+        assert result.version == "1"
+        assert len(result.components) == 1
+        assert result.components[0].name == "API"
+
+    def test_generate_calls_project_query(self):
+        """generate() calls project.query with the generate prompt."""
+        mock_shesha = MagicMock()
+        mock_project = MagicMock()
+        mock_shesha.get_project.return_value = mock_project
+
+        mock_result = MagicMock()
+        mock_result.answer = '{"overview": "Test", "components": [], "external_dependencies": []}'
+        mock_project.query.return_value = mock_result
+        mock_shesha._repo_ingester.get_saved_sha.return_value = "sha123"
+
+        generator = AnalysisGenerator(mock_shesha)
+        generator.generate("test-project")
+
+        mock_shesha.get_project.assert_called_once_with("test-project")
+        mock_project.query.assert_called_once()
+
+        # Verify prompt contains expected content
+        call_args = mock_project.query.call_args
+        prompt = call_args[0][0]
+        assert "overview" in prompt
+        assert "components" in prompt
+
+    def test_generate_handles_missing_sha(self):
+        """generate() handles missing SHA gracefully."""
+        mock_shesha = MagicMock()
+        mock_project = MagicMock()
+        mock_shesha.get_project.return_value = mock_project
+
+        mock_result = MagicMock()
+        mock_result.answer = '{"overview": "Test", "components": [], "external_dependencies": []}'
+        mock_project.query.return_value = mock_result
+        mock_shesha._repo_ingester.get_saved_sha.return_value = None
+
+        generator = AnalysisGenerator(mock_shesha)
+        result = generator.generate("test-project")
+
+        assert result.head_sha == ""  # Empty string when no SHA
