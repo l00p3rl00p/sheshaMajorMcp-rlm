@@ -4,7 +4,7 @@ import atexit
 import re
 import weakref
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import docker
 from docker.errors import DockerException
@@ -20,6 +20,7 @@ from shesha.sandbox.pool import ContainerPool
 from shesha.storage.filesystem import FilesystemStorage
 
 if TYPE_CHECKING:
+    from shesha.models import RepoAnalysis
     from shesha.parser.base import DocumentParser
 
 
@@ -189,6 +190,54 @@ class Shesha:
             is_local=is_local,
             source_exists=source_exists,
         )
+
+    def get_analysis_status(
+        self, project_id: str
+    ) -> Literal["current", "stale", "missing"]:
+        """Check the status of a project's codebase analysis.
+
+        Args:
+            project_id: ID of the project.
+
+        Returns:
+            "current" if analysis exists and matches current HEAD SHA,
+            "stale" if analysis exists but HEAD SHA has changed,
+            "missing" if no analysis exists.
+
+        Raises:
+            ValueError: If project doesn't exist.
+        """
+        if not self._storage.project_exists(project_id):
+            raise ValueError(f"Project '{project_id}' does not exist")
+
+        analysis = self._storage.load_analysis(project_id)
+        if analysis is None:
+            return "missing"
+
+        current_sha = self._repo_ingester.get_saved_sha(project_id)
+        if current_sha is None:
+            return "current"
+
+        if analysis.head_sha == current_sha:
+            return "current"
+
+        return "stale"
+
+    def get_analysis(self, project_id: str) -> "RepoAnalysis | None":
+        """Get the codebase analysis for a project.
+
+        Args:
+            project_id: ID of the project.
+
+        Returns:
+            RepoAnalysis if it exists, None otherwise.
+
+        Raises:
+            ValueError: If project doesn't exist.
+        """
+        if not self._storage.project_exists(project_id):
+            raise ValueError(f"Project '{project_id}' does not exist")
+        return self._storage.load_analysis(project_id)
 
     def check_repo_for_updates(self, project_id: str) -> RepoProjectResult:
         """Check if a cloned repository has updates available.

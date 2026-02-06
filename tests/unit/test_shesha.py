@@ -9,6 +9,14 @@ from shesha import Shesha
 from shesha.models import RepoProjectResult
 
 
+@pytest.fixture
+def shesha_instance(tmp_path: Path) -> Shesha:
+    """Create a Shesha instance with mocked Docker for testing."""
+    with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
+        shesha = Shesha(model="test-model", storage_path=tmp_path)
+        return shesha
+
+
 class TestDockerAvailability:
     """Tests for Docker availability check at startup."""
 
@@ -586,3 +594,102 @@ class TestExtractRepoName:
         """Unparseable URL falls back to unnamed-repo."""
         shesha = self._make_shesha(tmp_path)
         assert shesha._extract_repo_name("not-a-url") == "unnamed-repo"
+
+
+class TestAnalysisStatus:
+    """Tests for analysis status checking."""
+
+    def test_get_analysis_status_missing(self, shesha_instance: Shesha, tmp_path: Path):
+        """get_analysis_status returns 'missing' when no analysis exists."""
+        shesha_instance.create_project("no-analysis-project")
+        status = shesha_instance.get_analysis_status("no-analysis-project")
+        assert status == "missing"
+
+    def test_get_analysis_status_current(self, shesha_instance: Shesha, tmp_path: Path):
+        """get_analysis_status returns 'current' when analysis matches HEAD."""
+        from shesha.models import RepoAnalysis
+
+        shesha_instance.create_project("current-analysis")
+        analysis = RepoAnalysis(
+            version="1",
+            generated_at="2026-02-06T10:30:00Z",
+            head_sha="abc123",
+            overview="Test",
+            components=[],
+            external_dependencies=[],
+        )
+        shesha_instance._storage.store_analysis("current-analysis", analysis)
+        shesha_instance._repo_ingester.save_sha("current-analysis", "abc123")
+        shesha_instance._repo_ingester.save_source_url("current-analysis", "/fake/path")
+
+        status = shesha_instance.get_analysis_status("current-analysis")
+        assert status == "current"
+
+    def test_get_analysis_status_stale(self, shesha_instance: Shesha, tmp_path: Path):
+        """get_analysis_status returns 'stale' when analysis SHA differs from HEAD."""
+        from shesha.models import RepoAnalysis
+
+        shesha_instance.create_project("stale-analysis")
+        analysis = RepoAnalysis(
+            version="1",
+            generated_at="2026-02-06T10:30:00Z",
+            head_sha="old_sha_123",
+            overview="Test",
+            components=[],
+            external_dependencies=[],
+        )
+        shesha_instance._storage.store_analysis("stale-analysis", analysis)
+        shesha_instance._repo_ingester.save_sha("stale-analysis", "new_sha_456")
+        shesha_instance._repo_ingester.save_source_url("stale-analysis", "/fake/path")
+
+        status = shesha_instance.get_analysis_status("stale-analysis")
+        assert status == "stale"
+
+    def test_get_analysis_status_nonexistent_project_raises(self, shesha_instance: Shesha):
+        """get_analysis_status raises for nonexistent project."""
+        with pytest.raises(ValueError, match="does not exist"):
+            shesha_instance.get_analysis_status("no-such-project")
+
+
+class TestGetAnalysis:
+    """Tests for get_analysis method."""
+
+    def test_get_analysis_returns_stored_analysis(self, shesha_instance: Shesha):
+        """get_analysis returns the stored analysis."""
+        from shesha.models import AnalysisComponent, RepoAnalysis
+
+        shesha_instance.create_project("get-analysis-project")
+        comp = AnalysisComponent(
+            name="API",
+            path="api/",
+            description="REST API",
+            apis=[],
+            models=["User"],
+            entry_points=["main.py"],
+            internal_dependencies=[],
+        )
+        analysis = RepoAnalysis(
+            version="1",
+            generated_at="2026-02-06T10:30:00Z",
+            head_sha="abc123",
+            overview="Test app",
+            components=[comp],
+            external_dependencies=[],
+        )
+        shesha_instance._storage.store_analysis("get-analysis-project", analysis)
+
+        result = shesha_instance.get_analysis("get-analysis-project")
+        assert result is not None
+        assert result.overview == "Test app"
+        assert len(result.components) == 1
+
+    def test_get_analysis_returns_none_when_missing(self, shesha_instance: Shesha):
+        """get_analysis returns None when no analysis exists."""
+        shesha_instance.create_project("no-analysis")
+        result = shesha_instance.get_analysis("no-analysis")
+        assert result is None
+
+    def test_get_analysis_nonexistent_project_raises(self, shesha_instance: Shesha):
+        """get_analysis raises for nonexistent project."""
+        with pytest.raises(ValueError, match="does not exist"):
+            shesha_instance.get_analysis("no-such-project")
