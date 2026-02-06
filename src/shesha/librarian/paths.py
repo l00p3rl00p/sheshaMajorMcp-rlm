@@ -12,6 +12,11 @@ from pathlib import Path
 class LibrarianPaths:
     """Resolved state paths for Librarian."""
 
+    @property
+    def secret(self) -> Path:
+        """User secret for bridge authentication."""
+        return self.home / "secret.json"
+
     home: Path
     storage: Path
     logs: Path

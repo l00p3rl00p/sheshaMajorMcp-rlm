@@ -11,8 +11,7 @@ import { MessageMonitorScreen } from './screens/MessageMonitor';
 import { OperatorChatScreen } from './screens/OperatorChat';
 import { StagingAreaScreen } from './screens/StagingArea';
 import { PromptPreviewScreen } from './screens/PromptPreview';
-import { DataIngestionScreen } from './screens/DataIngestion';
-import { IngestionValidationScreen } from './screens/IngestionValidation';
+import { MountManagerScreen } from './screens/MountManager';
 import { DocumentationScreen } from './screens/Documentation';
 import { ScreenName } from './types';
 import { HelpCircle, Menu } from 'lucide-react';
@@ -37,8 +36,8 @@ const App: React.FC = () => {
       'operator-chat': 'Operator chat view with tool cards and clip gallery.',
       'staging-area': 'Build multi-step prompts from clips and fragments.',
       'prompt-preview': 'Token-aware prompt preview before execution.',
-      'data-ingestion': 'Upload UI (currently demo-only). Use CLI for real uploads.',
-      'ingestion-validation': 'Validation preview for ingestion batches (demo-only).',
+      'mount-manager': 'Manage local directory mounts/sources for observation.',
+      'styling-preview': 'Preview design system components.',
       documentation: 'Generated command list from mcp-server-readme.md (load a newer file to refresh).',
     }),
     []
@@ -58,8 +57,7 @@ const App: React.FC = () => {
     { id: 'operator-chat', label: 'Operator Chat' },
     { id: 'staging-area', label: 'Staging Area' },
     { id: 'prompt-preview', label: 'Prompt Preview' },
-    { id: 'data-ingestion', label: 'Data Ingestion' },
-    { id: 'ingestion-validation', label: 'Ingestion Validation' },
+    { id: 'mount-manager', label: 'Mount Manager' },
   ];
 
   const renderScreen = () => {
@@ -90,10 +88,8 @@ const App: React.FC = () => {
         return <StagingAreaScreen onNavigate={setCurrentScreen} />;
       case 'prompt-preview':
         return <PromptPreviewScreen onNavigate={setCurrentScreen} />;
-      case 'data-ingestion':
-        return <DataIngestionScreen onNavigate={setCurrentScreen} />;
-      case 'ingestion-validation':
-        return <IngestionValidationScreen onNavigate={setCurrentScreen} />;
+      case 'mount-manager':
+        return <MountManagerScreen onNavigate={setCurrentScreen} />;
       default:
         return <DashboardScreen onNavigate={setCurrentScreen} />;
     }

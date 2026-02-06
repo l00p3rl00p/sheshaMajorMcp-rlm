@@ -94,12 +94,8 @@ Contextual Wrapping: A dropdown to quickly swap which "System Prompt" or "Person
 One-Click Execution: Direct buttons to either copy the full formatted prompt to your clipboard or execute it immediately via the RLM interface.
 The interface remains developer-centric, utilizing monospace fonts for the preview to ensure you see exactly what the model sees.
 
-## Data Ingestion & Ingestion Validation
-
-interfaces to handle the critical task of populating the RLM with data, ensuring all files adhere to the system's strict requirements.
-The new screens include:
-	**•	Data Ingestion & Rule Config**: A central hub for uploading data. It features a futuristic drag-and-drop zone, support for both single and grouped file uploads, and a "Rule Configuration" panel where you can set ingestion strictness and target storage locations.
-	**•	Ingestion Validation Results**: A detailed feedback screen that acts as a gatekeeper. It scans every file in your upload batch against RLM rules, flagging incorrect file types or structural errors before they touch your permanent storage. It also includes a "Manifest Preview" so you can see the impact on your .librarian/manifest.json in real-time.
+	**•	Local Source Mounting**: A management hub for connecting local data sources. It features a "Pulse" monitor to ensure mounted directories remain accessible and provides visual confirmation of their linkage to CLI projects.
+	**•	Mount Validation**: Instead of complex ingestion rules, the system relies on the CLI's native recursive traversal validation, visually reporting sync status and connection health in real-time.
 
 
 

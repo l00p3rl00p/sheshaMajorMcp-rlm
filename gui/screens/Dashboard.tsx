@@ -1,10 +1,10 @@
 import React from 'react';
-import { 
-  CheckCircle2, 
-  Terminal, 
-  AlertTriangle, 
-  RefreshCw, 
-  FolderOpen, 
+import {
+  CheckCircle2,
+  Terminal,
+  AlertTriangle,
+  RefreshCw,
+  FolderOpen,
   Database,
   Bolt,
   Server
@@ -12,15 +12,29 @@ import {
 import { AppHeader, BottomNav } from '../components/Shared';
 import { ScreenName } from '../types';
 
+import { BridgeClient } from '../src/api/client';
+
 interface Props {
   onNavigate: (screen: ScreenName) => void;
 }
 
 export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
+  const [health, setHealth] = React.useState({ status: 'connecting', docker_available: false, version: '...' });
+
+  React.useEffect(() => {
+    const check = async () => {
+      const h = await BridgeClient.checkHealth();
+      setHealth(h);
+    };
+    check();
+    const interval = setInterval(check, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="flex flex-col min-h-screen bg-background-dark text-white font-display">
-      <AppHeader 
-        subtitle="Librarian MCP • v0.3.1"
+      <AppHeader
+        subtitle={`Librarian MCP • v${health.version}`}
         icon={<Server size={20} className="text-primary" />}
       />
 
@@ -29,12 +43,12 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         <section>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {/* Server Status */}
-            <div className="p-4 rounded-xl bg-surface-dark border border-border-dark flex flex-col gap-2 shadow-sm">
+            <div className={`p-4 rounded-xl bg-surface-dark border ${health.status === 'active' ? 'border-green-500/30' : 'border-red-500/30'} flex flex-col gap-2 shadow-sm`}>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Server</span>
-                <CheckCircle2 size={20} className="text-primary" />
+                <CheckCircle2 size={20} className={health.status === 'active' ? "text-green-500" : "text-red-500"} />
               </div>
-              <p className="text-xl font-bold font-display">Active</p>
+              <p className="text-xl font-bold font-display capitalize">{health.status}</p>
             </div>
 
             {/* MCP Stdio */}
@@ -46,15 +60,15 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
               <p className="text-xl font-bold font-display">Ready</p>
             </div>
 
-            {/* Docker Engine (Degraded) */}
-            <div className="col-span-1 p-4 rounded-xl bg-surface-dark border border-yellow-500/20 flex flex-col gap-1 shadow-sm relative overflow-hidden group">
-              <div className="absolute -right-4 -top-4 w-12 h-12 bg-yellow-500/10 rounded-full blur-xl"></div>
+            {/* Docker Engine */}
+            <div className={`col-span-1 p-4 rounded-xl bg-surface-dark border ${health.docker_available ? 'border-green-500/30' : 'border-yellow-500/30'} flex flex-col gap-1 shadow-sm relative overflow-hidden group`}>
+              {!health.docker_available && <div className="absolute -right-4 -top-4 w-12 h-12 bg-yellow-500/10 rounded-full blur-xl"></div>}
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Docker</span>
-                <AlertTriangle size={20} className="text-yellow-500" />
+                {health.docker_available ? <CheckCircle2 size={20} className="text-green-500" /> : <AlertTriangle size={20} className="text-yellow-500" />}
               </div>
-              <p className="text-xl font-bold font-display">Degraded</p>
-              <p className="text-[10px] font-mono text-yellow-500 bg-yellow-500/10 px-1.5 py-0.5 rounded w-fit mt-1">QUERY_DISABLED</p>
+              <p className="text-xl font-bold font-display">{health.docker_available ? 'Available' : 'Degraded'}</p>
+              {!health.docker_available && <p className="text-[10px] font-mono text-yellow-500 bg-yellow-500/10 px-1.5 py-0.5 rounded w-fit mt-1">QUERY_DISABLED</p>}
             </div>
 
             {/* Manifest Sync */}
@@ -136,7 +150,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
 
       {/* Floating Action Button */}
       <div className="absolute bottom-24 right-5 z-40">
-        <button 
+        <button
           onClick={() => onNavigate('agent-center')}
           className="flex items-center justify-center h-12 w-12 rounded-full bg-primary text-background-dark shadow-lg shadow-primary/30 active:scale-95 transition-transform hover:bg-white hover:text-black"
           title="Open Agent Center"

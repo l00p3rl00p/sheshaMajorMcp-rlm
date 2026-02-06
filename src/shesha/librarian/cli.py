@@ -17,7 +17,7 @@ from docker.errors import DockerException, ImageNotFound
 
 from shesha import __version__
 from shesha.exceptions import SheshaError
-from shesha.librarian.core import LibrarianCore, ValidationError
+from shesha.librarian.core import LibrarianCore, ValidationError, get_or_create_bridge_secret
 from shesha.librarian.manifest import LibrarianManifest, SelfTestStatus
 from shesha.librarian.mcp_jsonrpc import encode_message, parse_messages
 from shesha.librarian.paths import LibrarianPaths, resolve_paths
@@ -668,6 +668,12 @@ def _build_parser() -> argparse.ArgumentParser:
     create = proj_sub.add_parser("create", help="Create a project")
     create.add_argument("project_id")
     create.add_argument(
+        "--mount-path",
+        type=Path,
+        default=None,
+        help="Local directory to mount/bind to this project",
+    )
+    create.add_argument(
         "--storage-path",
         type=Path,
         default=None,
@@ -694,7 +700,71 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Override storage directory",
     )
 
+    # Bridge command
+    bridge = sub.add_parser(
+        "bridge",
+        help="Start local backend bridge for GUI",
+        description="Run local API server bridging CLI to Browser GUI",
+    )
+    bridge.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind (default: 127.0.0.1)",
+    )
+    bridge.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Port to bind (default: 8000)",
+    )
+
+    mount = sub.add_parser("mount", help="Manage directory mounts (alias for projects)")
+    mount_sub = mount.add_subparsers(dest="mount_cmd", required=True)
+    mount_sub.add_parser("list", help="List mounted paths").add_argument(
+        "--storage-path", type=Path, default=None, help="Override storage directory"
+    )
+    mcreate = mount_sub.add_parser("create", help="Mount a local directory")
+    mcreate.add_argument("project_id", help="ID for the new mount")
+    mcreate.add_argument("mount_path", type=Path, help="Local directory to bind")
+    mcreate.add_argument(
+        "--storage-path", type=Path, default=None, help="Override storage directory"
+    )
+
+    # GUI command (Seamless launcher)
+    gui = sub.add_parser(
+        "gui",
+        help="Launch the Shesha GUI in your browser",
+    )
+    gui.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Bridge port (default: 8000)",
+    )
+
     return parser
+
+
+def command_bridge(args: argparse.Namespace) -> None:
+    """Run the bridge server."""
+    from shesha.bridge.server import run_server
+
+    # Note: SecureConnect #31 - Loopback-only by default
+    run_server(host=args.host, port=args.port)
+
+
+def command_gui(args: argparse.Namespace) -> None:
+    """Launch the GUI with a seamless secret token."""
+    import webbrowser
+
+    key = get_or_create_bridge_secret()
+    # TODO: In production, this would be the actual hosted or local build URL.
+    # For now, we point to the Vite dev server default.
+    url = f"http://localhost:5173/?key={key}"
+
+    print(f"🚀 Launching GUI: {url}")
+    print("If browser doesn't open, copy and paste the URL above.")
+    webbrowser.open(url)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -729,6 +799,10 @@ def main(argv: list[str] | None = None) -> int:
         if not result.ok:
             print(result.details, file=sys.stderr)
             return 1
+        
+        # Ensure bridge secret is generated on install
+        get_or_create_bridge_secret(paths)
+        
         _print_install_summary(paths=paths, manifest_dir=manifest_dir)
         return 0
 
@@ -765,7 +839,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.projects_cmd == "create":
             try:
-                core.create_project(args.project_id)
+                core.create_project(args.project_id, mount_path=getattr(args, "mount_path", None))
             except (SheshaError, ValidationError, ValueError) as e:
                 print(str(e), file=sys.stderr)
                 return 2
@@ -780,6 +854,27 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"status": "deleted", "project_id": args.project_id}, indent=2))
             return 0
 
+    if cmd == "mount":
+        storage_path = getattr(args, "storage_path", None) or resolved.storage
+        core = LibrarianCore(storage_path=storage_path)
+        if args.mount_cmd == "list":
+            # Show metadata (id + mount_path) for better "Working Code" visibility
+            metadata = core.list_projects_metadata()
+            print(json.dumps({"mounts": metadata}, indent=2))
+            return 0
+        if args.mount_cmd == "create":
+            try:
+                core.create_project(args.project_id, mount_path=args.mount_path)
+            except (SheshaError, ValidationError, ValueError) as e:
+                print(str(e), file=sys.stderr)
+                return 2
+            print(json.dumps({
+                "status": "mounted", 
+                "mount_id": args.project_id, 
+                "path": str(args.mount_path)
+            }, indent=2))
+            return 0
+
     if cmd == "upload":
         storage_path = args.storage_path if args.storage_path is not None else resolved.storage
         core = LibrarianCore(storage_path=storage_path)
@@ -789,6 +884,14 @@ def main(argv: list[str] | None = None) -> int:
             print(str(e), file=sys.stderr)
             return 2
         print(json.dumps({"uploaded": uploaded}, indent=2))
+        return 0
+
+    if cmd == "bridge":
+        command_bridge(args)
+        return 0
+
+    if cmd == "gui":
+        command_gui(args)
         return 0
 
     raise RuntimeError(f"Unhandled command: {cmd}")

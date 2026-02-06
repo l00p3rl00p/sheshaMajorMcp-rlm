@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
+import secrets
 import threading
 from pathlib import Path
 
 from shesha import Shesha
+from shesha.librarian.paths import resolve_paths, LibrarianPaths
 from shesha.parser import create_default_registry
 from shesha.project import Project
 from shesha.storage.filesystem import FilesystemStorage
@@ -39,6 +42,33 @@ def validate_question(question: str) -> str:
     return question
 
 
+def get_or_create_bridge_secret(paths: LibrarianPaths | None = None) -> str:
+    """Get or generate a persistent secret for bridge auth."""
+    if paths is None:
+        paths = resolve_paths()
+    
+    paths.ensure_dirs()
+    secret_file = paths.secret
+    
+    if secret_file.exists():
+        try:
+            data = json.loads(secret_file.read_text())
+            if "bridge_key" in data:
+                return str(data["bridge_key"])
+        except (json.JSONDecodeError, KeyError):
+            pass
+            
+    # Generate new secret
+    key = secrets.token_urlsafe(32)
+    secret_file.write_text(json.dumps({"bridge_key": key}))
+    # Secure permissions: 600 (owner read/write only)
+    try:
+        os.chmod(secret_file, 0o600)
+    except OSError:
+        pass
+    return key
+
+
 class LibrarianCore:
     """Shared stateful wrapper around Shesha + storage utilities."""
 
@@ -64,12 +94,13 @@ class LibrarianCore:
         self._shesha_lock = threading.Lock()
         self._shesha: Shesha | None = None
 
-    def list_projects(self) -> list[str]:
-        return self._storage.list_projects()
+    def list_projects_metadata(self) -> list[dict]:
+        project_ids = self._storage.list_projects()
+        return [self._storage.get_project_metadata(pid) for pid in project_ids]
 
-    def create_project(self, project_id: str) -> None:
+    def create_project(self, project_id: str, mount_path: Path | None = None) -> None:
         project_id = validate_project_id(project_id)
-        self._storage.create_project(project_id)
+        self._storage.create_project(project_id, mount_path=mount_path)
 
     def delete_project(self, project_id: str) -> None:
         project_id = validate_project_id(project_id)

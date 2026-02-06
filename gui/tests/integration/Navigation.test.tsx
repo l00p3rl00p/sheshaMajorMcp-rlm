@@ -6,7 +6,7 @@ describe('App Integration', () => {
     it('starts on the dashboard screen', () => {
         render(<App />);
         // Check for dashboard elements
-        expect(screen.getByText('Librarian MCP • v0.3.1')).toBeInTheDocument();
+        expect(screen.getByText(/Librarian MCP • v/i)).toBeInTheDocument();
     });
 
     it('navigates to CLI Reference via bottom nav', () => {

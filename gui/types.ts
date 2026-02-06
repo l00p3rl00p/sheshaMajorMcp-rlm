@@ -1,18 +1,18 @@
-export type ScreenName = 
-  | 'dashboard' 
-  | 'cli' 
-  | 'capabilities' 
-  | 'persistence' 
-  | 'agent-center' 
-  | 'agent-config' 
+export type ScreenName =
+  | 'dashboard'
+  | 'cli'
+  | 'capabilities'
+  | 'persistence'
+  | 'agent-center'
+  | 'agent-config'
   | 'live-interaction'
   | 'query-console'
   | 'message-monitor'
   | 'operator-chat'
   | 'staging-area'
+  | 'styling-preview'
+  | 'mount-manager'
   | 'prompt-preview'
-  | 'data-ingestion'
-  | 'ingestion-validation'
   | 'documentation';
 
 export interface LogEntry {
