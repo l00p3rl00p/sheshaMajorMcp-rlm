@@ -61,7 +61,7 @@ def read_multiline_input() -> str:
                 break
             lines.append(line)
     except EOFError:
-        pass
+        pass  # User pressed Ctrl+D to signal end of input
     return "\n".join(lines)
 
 
