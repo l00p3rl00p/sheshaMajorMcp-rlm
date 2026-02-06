@@ -262,6 +262,41 @@ def write_session(
     return str(filepath)
 
 
+def format_analysis_as_context(analysis: "RepoAnalysis") -> str:
+    """Format a RepoAnalysis as compact context for LLM query injection.
+
+    Args:
+        analysis: The analysis to format.
+
+    Returns:
+        Formatted string suitable for prepending to user queries.
+    """
+    lines = ["=== Codebase Analysis ===", analysis.overview]
+
+    if analysis.components:
+        lines.append("")
+        lines.append("Components:")
+        for comp in analysis.components:
+            lines.append(f"- {comp.name} ({comp.path}): {comp.description}")
+            if comp.apis:
+                for api in comp.apis:
+                    api_type = api.get("type", "unknown")
+                    endpoints = api.get("endpoints", [])
+                    if endpoints:
+                        lines.append(f"  APIs ({api_type}): {', '.join(endpoints[:5])}")
+            if comp.models:
+                lines.append(f"  Models: {', '.join(comp.models)}")
+
+    if analysis.external_dependencies:
+        lines.append("")
+        lines.append("External Dependencies:")
+        for dep in analysis.external_dependencies:
+            lines.append(f"- {dep.name} ({dep.type}): {dep.description}")
+
+    lines.append("===")
+    return "\n".join(lines)
+
+
 def format_analysis_for_display(analysis: "RepoAnalysis") -> str:
     """Format a RepoAnalysis for terminal display.
 

@@ -65,6 +65,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from script_utils import (
     ThinkingSpinner,
+    format_analysis_as_context,
     format_analysis_for_display,
     format_history_prefix,
     format_progress,
@@ -155,6 +156,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--verbose",
         action="store_true",
         help="Show execution stats after each answer",
+    )
+    parser.add_argument(
+        "--pristine",
+        action="store_true",
+        help="Skip using pre-computed analysis as query context",
     )
     return parser.parse_args(argv)
 
@@ -338,7 +344,11 @@ def check_and_prompt_analysis(shesha: Shesha, project_id: str) -> None:
 
 
 def run_interactive_loop(
-    project: Project, verbose: bool, project_name: str, shesha: Shesha
+    project: Project,
+    verbose: bool,
+    project_name: str,
+    shesha: Shesha,
+    analysis_context: str | None = None,
 ) -> None:
     """Run the interactive question-answer loop for querying the codebase.
 
@@ -352,12 +362,17 @@ def run_interactive_loop(
             and progress updates during query processing.
         project_name: Name or URL of the project for session transcript metadata.
         shesha: Shesha instance for analysis commands.
+        analysis_context: Pre-formatted analysis text to prepend to queries.
+            When set, each query includes this context so the LLM has structural
+            knowledge of the codebase. Pass None to skip (equivalent to --pristine).
 
     Note:
         The loop continues until the user types "quit", "exit", or presses
         Ctrl+C/Ctrl+D. Conversation history is maintained in memory and
         prepended to each query for context.
     """
+    if analysis_context:
+        print("Using codebase analysis as context. Use --pristine to disable.")
     print()
     print("Ask questions about the codebase.")
     print('Type "help" or "?" for commands.')
@@ -440,7 +455,14 @@ def run_interactive_loop(
                     spinner.start()
 
             prefix = format_history_prefix(history)
-            full_question = f"{prefix}{user_input}" if prefix else user_input
+            if analysis_context and prefix:
+                full_question = f"{analysis_context}\n\n{prefix}{user_input}"
+            elif analysis_context:
+                full_question = f"{analysis_context}\n\n{user_input}"
+            elif prefix:
+                full_question = f"{prefix}{user_input}"
+            else:
+                full_question = user_input
             result = project.query(full_question, on_progress=on_progress)
             spinner.stop()
 
@@ -562,8 +584,15 @@ def main() -> None:
     # Check analysis status
     check_and_prompt_analysis(shesha, project.project_id)
 
+    # Load analysis context for query injection
+    analysis_context = None
+    if not args.pristine:
+        analysis = shesha.get_analysis(project.project_id)
+        if analysis:
+            analysis_context = format_analysis_as_context(analysis)
+
     # Enter interactive loop
-    run_interactive_loop(project, args.verbose, project.project_id, shesha)
+    run_interactive_loop(project, args.verbose, project.project_id, shesha, analysis_context)
 
 
 if __name__ == "__main__":
