@@ -317,8 +317,10 @@ def check_and_prompt_analysis(shesha: Shesha, project_id: str) -> None:
             response = input("Generate analysis? (y/n): ").strip().lower()
             if response == "y":
                 print("Generating analysis (this may take a minute)...")
-                shesha.generate_analysis(project_id)
-                print("Analysis complete.")
+                analysis = shesha.generate_analysis(project_id)
+                print("Analysis complete.\n")
+                print(format_analysis_for_display(analysis))
+                print()
         except (EOFError, KeyboardInterrupt):
             print()  # Clean line after interrupt
     elif status == "stale":
@@ -327,8 +329,10 @@ def check_and_prompt_analysis(shesha: Shesha, project_id: str) -> None:
             response = input("Regenerate analysis? (y/n): ").strip().lower()
             if response == "y":
                 print("Regenerating analysis...")
-                shesha.generate_analysis(project_id)
-                print("Analysis updated.")
+                analysis = shesha.generate_analysis(project_id)
+                print("Analysis updated.\n")
+                print(format_analysis_for_display(analysis))
+                print()
         except (EOFError, KeyboardInterrupt):
             print()  # Clean line after interrupt
 
