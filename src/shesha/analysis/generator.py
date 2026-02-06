@@ -54,7 +54,7 @@ class AnalysisGenerator:
             try:
                 return cast(dict[str, Any], json.loads(json_match.group(1)))
             except json.JSONDecodeError:
-                pass
+                pass  # Invalid JSON in code block, try raw extraction below
 
         # Try to find raw JSON
         start_idx = text.find("{")
@@ -65,7 +65,7 @@ class AnalysisGenerator:
                     try:
                         return cast(dict[str, Any], json.loads(candidate))
                     except json.JSONDecodeError:
-                        continue
+                        continue  # Not valid JSON, try shorter substring
 
         return None
 

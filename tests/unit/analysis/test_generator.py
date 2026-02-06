@@ -133,3 +133,23 @@ class TestAnalysisGeneration:
         result = generator.generate("test-project")
 
         assert result.head_sha == ""  # Empty string when no SHA
+
+    def test_generate_handles_invalid_json(self):
+        """generate() falls back to raw answer when JSON extraction fails."""
+        mock_shesha = MagicMock()
+        mock_project = MagicMock()
+        mock_shesha.get_project.return_value = mock_project
+
+        # Response with no valid JSON - just plain text
+        mock_result = MagicMock()
+        mock_result.answer = "This is a plain text response with no JSON."
+        mock_project.query.return_value = mock_result
+        mock_shesha._repo_ingester.get_saved_sha.return_value = "sha456"
+
+        generator = AnalysisGenerator(mock_shesha)
+        result = generator.generate("test-project")
+
+        # Fallback: raw answer becomes overview, empty components/deps
+        assert result.overview == "This is a plain text response with no JSON."
+        assert result.components == []
+        assert result.external_dependencies == []
