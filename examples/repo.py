@@ -60,8 +60,8 @@ from shesha import Shesha, SheshaConfig
 from shesha.exceptions import RepoIngestError
 from shesha.rlm.trace import StepType
 
-# Storage path for repo projects
-STORAGE_PATH = Path.home() / ".shesha" / "repos"
+# Storage path for repo projects (not "repos" - that collides with RepoIngester's subdirectory)
+STORAGE_PATH = Path.home() / ".shesha" / "repo-explorer"
 
 INTERACTIVE_HELP = """\
 Shesha Repository Explorer - Ask questions about the indexed codebase.
