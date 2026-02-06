@@ -40,8 +40,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Analyze PRD impact across multiple repositories")
     parser.add_argument(
         "repos",
-        nargs="+",
-        help="Git repository URLs or local paths to analyze",
+        nargs="*",
+        help="Git repository URLs or local paths to analyze (shows picker if omitted)",
+    )
+    parser.add_argument(
+        "--prd",
+        help="Path to PRD markdown file (prompts for paste if omitted)",
     )
     parser.add_argument(
         "--verbose",
