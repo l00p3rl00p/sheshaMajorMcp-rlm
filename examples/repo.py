@@ -56,6 +56,28 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+# Allow importing script_utils whether running as a script or as a module.
+# When run directly (python examples/repo.py), Python adds examples/ to sys.path
+# automatically, so "from script_utils import" works. But when imported as a module
+# (from examples.repo import ...), examples/ isn't in sys.path. This ensures
+# script_utils is always findable, avoiding duplicate import lists for each mode.
+sys.path.insert(0, str(Path(__file__).parent))
+
+from script_utils import (
+    ThinkingSpinner,
+    format_history_prefix,
+    format_progress,
+    format_stats,
+    format_thought_time,
+    install_urllib3_cleanup_hook,
+    is_exit_command,
+    is_help_command,
+    is_write_command,
+    parse_write_command,
+    should_warn_history_size,
+    write_session,
+)
+
 from shesha import Shesha, SheshaConfig
 from shesha.exceptions import RepoIngestError
 from shesha.rlm.trace import StepType
@@ -73,38 +95,6 @@ Commands:
   quit, exit           Leave the session
 
 Tip: Use --verbose flag for execution stats after each answer."""
-
-# Support both running as script and importing as module
-if __name__ == "__main__":
-    from script_utils import (
-        ThinkingSpinner,
-        format_history_prefix,
-        format_progress,
-        format_stats,
-        format_thought_time,
-        install_urllib3_cleanup_hook,
-        is_exit_command,
-        is_help_command,
-        is_write_command,
-        parse_write_command,
-        should_warn_history_size,
-        write_session,
-    )
-else:
-    from .script_utils import (
-        ThinkingSpinner,
-        format_history_prefix,
-        format_progress,
-        format_stats,
-        format_thought_time,
-        install_urllib3_cleanup_hook,
-        is_exit_command,
-        is_help_command,
-        is_write_command,
-        parse_write_command,
-        should_warn_history_size,
-        write_session,
-    )
 
 if TYPE_CHECKING:
     from shesha.models import RepoProjectResult
