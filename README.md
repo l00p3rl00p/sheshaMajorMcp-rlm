@@ -78,6 +78,16 @@ See [Sample Session](#sample-session) for a demo: tracking 30 chronological even
 
 So far it seems to work, but it's only been tested with .txt documents and the OpenAI API. It _should_ support PDFs, Word Documents, and other files. Your mileage may vary.
 
+## Optional GUI (Operator Dashboard)
+
+The optional GUI lives in the `gui` folder (the repo root does not contain a Node `package.json`).
+
+```bash
+cd gui
+npm install
+npm run dev
+```
+
 ## Prerequisites
 
 - Python 3.11+
