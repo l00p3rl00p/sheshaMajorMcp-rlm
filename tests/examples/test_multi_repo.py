@@ -274,3 +274,87 @@ class TestShowMultiPicker:
         captured = capsys.readouterr()
         assert "[multi-repo]" in captured.out
         assert "[repo-explorer]" in captured.out
+
+
+class TestMainIntegration:
+    """Tests for main() wiring."""
+
+    def test_no_args_shows_picker(self) -> None:
+        """No CLI args triggers picker."""
+        import os
+        import sys as sys_mod
+
+        from multi_repo import main
+
+        mock_shesha = MagicMock()
+        mock_shesha.list_projects.return_value = ["org-auth"]
+        mock_shesha.get_project_info.return_value = MagicMock(
+            project_id="org-auth",
+            source_url="https://github.com/org/auth",
+            is_local=False,
+            source_exists=True,
+        )
+
+        with patch.object(sys_mod, "argv", ["multi_repo.py"]):
+            with patch.dict(os.environ, {"SHESHA_API_KEY": "test-key"}, clear=True):
+                with patch("multi_repo.Shesha", return_value=mock_shesha):
+                    with patch("multi_repo.SheshaConfig"):
+                        with patch("multi_repo.show_multi_picker", return_value=[("org-auth", "https://github.com/org/auth", "multi-repo")]) as mock_picker:
+                            with patch("multi_repo.collect_repos_from_storages", return_value=[("org-auth", "https://github.com/org/auth", "multi-repo")]):
+                                with patch("multi_repo.MultiRepoAnalyzer") as mock_analyzer_cls:
+                                    mock_analyzer = MagicMock()
+                                    mock_analyzer.repos = ["org-auth"]
+                                    mock_analyzer.failed_repos = {}
+                                    mock_analyzer_cls.return_value = mock_analyzer
+                                    with patch("multi_repo.read_prd", return_value="some prd"):
+                                        with patch("builtins.input", return_value="n"):
+                                            try:
+                                                main()
+                                            except (SystemExit, Exception):
+                                                pass
+
+        mock_picker.assert_called_once()
+
+    def test_repos_args_skips_picker(self) -> None:
+        """CLI repo args skip the picker."""
+        import os
+        import sys as sys_mod
+
+        from multi_repo import main
+
+        mock_shesha = MagicMock()
+
+        with patch.object(sys_mod, "argv", ["multi_repo.py", "https://github.com/org/auth"]):
+            with patch.dict(os.environ, {"SHESHA_API_KEY": "test-key"}, clear=True):
+                with patch("multi_repo.Shesha", return_value=mock_shesha):
+                    with patch("multi_repo.SheshaConfig"):
+                        with patch("multi_repo.show_multi_picker") as mock_picker:
+                            with patch("multi_repo.MultiRepoAnalyzer") as mock_analyzer_cls:
+                                mock_analyzer = MagicMock()
+                                mock_analyzer.repos = ["org-auth"]
+                                mock_analyzer.failed_repos = {}
+                                mock_analyzer_cls.return_value = mock_analyzer
+                                with patch("multi_repo.read_prd", return_value="some prd"):
+                                    with patch("builtins.input", return_value="n"):
+                                        try:
+                                            main()
+                                        except (SystemExit, Exception):
+                                            pass
+
+        mock_picker.assert_not_called()
+
+    def test_no_api_key_exits(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Missing API key should print error and exit."""
+        import os
+        import sys as sys_mod
+
+        from multi_repo import main
+
+        with patch.object(sys_mod, "argv", ["multi_repo.py"]):
+            with patch.dict(os.environ, {}, clear=True):
+                with pytest.raises(SystemExit) as exc_info:
+                    main()
+
+        assert exc_info.value.code == 1
+        captured = capsys.readouterr()
+        assert "SHESHA_API_KEY" in captured.out

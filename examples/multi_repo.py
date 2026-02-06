@@ -204,8 +204,29 @@ def main() -> None:
 
     analyzer = MultiRepoAnalyzer(shesha)
 
+    # Determine repos
+    if args.repos:
+        # Repos provided as CLI args
+        repo_urls = args.repos
+    else:
+        # Interactive picker
+        explorer_config = SheshaConfig.load(storage_path=EXPLORER_STORAGE_PATH)
+        explorer_shesha = Shesha(config=explorer_config)
+        available = collect_repos_from_storages(shesha, explorer_shesha)
+
+        if not available:
+            print("No repositories indexed yet.")
+            url = input("Enter repo URL or local path: ").strip()
+            if not url:
+                print("No repository specified. Exiting.")
+                sys.exit(0)
+            repo_urls = [url]
+        else:
+            selected = show_multi_picker(available)
+            repo_urls = [source_url or project_id for project_id, source_url, _label in selected]
+
     # Add repos
-    for url in args.repos:
+    for url in repo_urls:
         print(f"Adding: {url}")
         project_id = analyzer.add_repo(url)
         if project_id:
