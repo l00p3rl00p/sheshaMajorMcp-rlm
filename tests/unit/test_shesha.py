@@ -693,3 +693,64 @@ class TestGetAnalysis:
         """get_analysis raises for nonexistent project."""
         with pytest.raises(ValueError, match="does not exist"):
             shesha_instance.get_analysis("no-such-project")
+
+
+class TestGenerateAnalysis:
+    """Tests for generate_analysis method."""
+
+    def test_generate_analysis_stores_result(self, shesha_instance):
+        """generate_analysis stores the generated analysis."""
+        from shesha.models import RepoAnalysis
+
+        # Create a project
+        shesha_instance.create_project("gen-analysis")
+        shesha_instance._repo_ingester.save_sha("gen-analysis", "sha123")
+
+        # Mock the generator
+        mock_analysis = RepoAnalysis(
+            version="1",
+            generated_at="2026-02-06T10:30:00Z",
+            head_sha="sha123",
+            overview="Generated analysis",
+            components=[],
+            external_dependencies=[],
+        )
+
+        with patch("shesha.shesha.AnalysisGenerator") as mock_generator:
+            mock_generator.return_value.generate.return_value = mock_analysis
+
+            result = shesha_instance.generate_analysis("gen-analysis")
+
+            assert result.overview == "Generated analysis"
+            # Verify it was stored
+            stored = shesha_instance._storage.load_analysis("gen-analysis")
+            assert stored is not None
+            assert stored.overview == "Generated analysis"
+
+    def test_generate_analysis_returns_analysis(self, shesha_instance):
+        """generate_analysis returns the generated RepoAnalysis."""
+        from shesha.models import RepoAnalysis
+
+        shesha_instance.create_project("return-analysis")
+
+        mock_analysis = RepoAnalysis(
+            version="1",
+            generated_at="2026-02-06T10:30:00Z",
+            head_sha="abc",
+            overview="Test",
+            components=[],
+            external_dependencies=[],
+        )
+
+        with patch("shesha.shesha.AnalysisGenerator") as mock_generator:
+            mock_generator.return_value.generate.return_value = mock_analysis
+
+            result = shesha_instance.generate_analysis("return-analysis")
+
+            assert isinstance(result, RepoAnalysis)
+            assert result.overview == "Test"
+
+    def test_generate_analysis_nonexistent_project_raises(self, shesha_instance):
+        """generate_analysis raises for nonexistent project."""
+        with pytest.raises(ValueError, match="does not exist"):
+            shesha_instance.generate_analysis("no-such-project")

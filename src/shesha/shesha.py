@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Literal
 import docker
 from docker.errors import DockerException
 
+from shesha.analysis import AnalysisGenerator
 from shesha.config import SheshaConfig
 from shesha.exceptions import RepoIngestError
 from shesha.models import ParsedDocument, ProjectInfo, RepoProjectResult
@@ -238,6 +239,26 @@ class Shesha:
         if not self._storage.project_exists(project_id):
             raise ValueError(f"Project '{project_id}' does not exist")
         return self._storage.load_analysis(project_id)
+
+    def generate_analysis(self, project_id: str) -> "RepoAnalysis":
+        """Generate and store a codebase analysis for a project.
+
+        Args:
+            project_id: ID of the project to analyze.
+
+        Returns:
+            The generated RepoAnalysis.
+
+        Raises:
+            ValueError: If project doesn't exist.
+        """
+        if not self._storage.project_exists(project_id):
+            raise ValueError(f"Project '{project_id}' does not exist")
+
+        generator = AnalysisGenerator(self)
+        analysis = generator.generate(project_id)
+        self._storage.store_analysis(project_id, analysis)
+        return analysis
 
     def check_repo_for_updates(self, project_id: str) -> RepoProjectResult:
         """Check if a cloned repository has updates available.
