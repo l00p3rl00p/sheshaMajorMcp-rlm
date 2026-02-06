@@ -61,7 +61,7 @@ export const QueryConsoleScreen: React.FC<Props> = ({ onNavigate }) => {
           <h1 className="text-lg font-bold tracking-tight">Shesha RLM</h1>
         </div>
         <div className="flex items-center gap-2">
-           <button onClick={() => onNavigate('agent-center')} className="text-gray-400 hover:text-white transition-colors">
+           <button onClick={() => onNavigate('agent-center')} className="text-gray-400 hover:text-white transition-colors" title="Back to Agent Center">
               <History size={20} />
            </button>
         </div>
@@ -93,6 +93,7 @@ export const QueryConsoleScreen: React.FC<Props> = ({ onNavigate }) => {
               <button 
                 onClick={handleRun}
                 className={`absolute bottom-4 right-4 w-12 h-12 rounded-full text-white shadow-[0_0_20px_rgba(59,130,246,0.5)] flex items-center justify-center transition-all active:scale-95 group-hover:scale-105 z-20 ${isRunning ? 'bg-blue-600' : 'bg-blue-500 hover:bg-blue-400'}`}
+                title="Run query (demo)"
               >
                  {isRunning ? (
                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
@@ -135,12 +136,14 @@ export const QueryConsoleScreen: React.FC<Props> = ({ onNavigate }) => {
               <button 
                 onClick={handleClip}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-blue-500/30 text-blue-400 hover:bg-blue-500/10 transition-colors text-sm font-semibold active:scale-[0.98]"
+                title="Clip response to scratchpad"
               >
                  <Scissors size={16} /> Clip Response
               </button>
               <button 
                 onClick={handleCopy}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-surface-dark border border-white/10 hover:bg-white/5 transition-colors text-gray-300 text-sm font-semibold active:scale-[0.98]"
+                title="Copy response"
               >
                  {copied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />} 
                  {copied ? 'Copied' : 'Copy'}
@@ -158,9 +161,10 @@ export const QueryConsoleScreen: React.FC<Props> = ({ onNavigate }) => {
       >
          <div className="h-14 flex items-center justify-between px-4 border-b border-white/5">
             <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Scratchpad</span>
-            <button 
+           <button 
               onClick={() => setIsDrawerOpen(false)}
               className="p-1 rounded hover:bg-white/10 text-gray-400"
+              title="Close scratchpad"
             >
                <ChevronRight size={20} />
             </button>
@@ -172,8 +176,8 @@ export const QueryConsoleScreen: React.FC<Props> = ({ onNavigate }) => {
                   <div className="flex justify-between items-start mb-2">
                      <span className="text-[10px] font-mono text-gray-500">{clip.time}</span>
                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button className="p-1 hover:text-white text-gray-500"><Copy size={12} /></button>
-                        <button className="p-1 hover:text-red-400 text-gray-500"><Trash2 size={12} /></button>
+                        <button className="p-1 hover:text-white text-gray-500" title="Copy clip"><Copy size={12} /></button>
+                        <button className="p-1 hover:text-red-400 text-gray-500" title="Delete clip"><Trash2 size={12} /></button>
                      </div>
                   </div>
                   <pre className="font-mono text-[10px] text-gray-300 overflow-hidden line-clamp-4 leading-relaxed">
@@ -191,7 +195,7 @@ export const QueryConsoleScreen: React.FC<Props> = ({ onNavigate }) => {
          </div>
 
          <div className="p-3 border-t border-white/5 bg-black/20">
-            <button className="w-full py-2 bg-primary/10 text-primary border border-primary/20 rounded-lg text-xs font-bold uppercase tracking-wide hover:bg-primary/20 transition-colors flex items-center justify-center gap-2">
+            <button className="w-full py-2 bg-primary/10 text-primary border border-primary/20 rounded-lg text-xs font-bold uppercase tracking-wide hover:bg-primary/20 transition-colors flex items-center justify-center gap-2" title="Save all clips (demo)">
                <Save size={14} /> Save All
             </button>
          </div>
@@ -202,6 +206,7 @@ export const QueryConsoleScreen: React.FC<Props> = ({ onNavigate }) => {
          <button 
            onClick={() => setIsDrawerOpen(true)}
            className="absolute right-0 top-1/2 -translate-y-1/2 bg-surface-dark border-l border-y border-white/10 p-1.5 rounded-l-lg text-gray-400 hover:text-white shadow-lg z-40"
+           title="Open scratchpad"
          >
             <ChevronLeft size={20} />
          </button>

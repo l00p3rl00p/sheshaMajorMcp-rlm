@@ -12,7 +12,8 @@ export type ScreenName =
   | 'staging-area'
   | 'prompt-preview'
   | 'data-ingestion'
-  | 'ingestion-validation';
+  | 'ingestion-validation'
+  | 'documentation';
 
 export interface LogEntry {
   timestamp: string;

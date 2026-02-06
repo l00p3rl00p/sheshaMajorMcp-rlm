@@ -1,8 +1,7 @@
 """Tests for Librarian CLI Docker installation logic."""
 
-import io
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -81,7 +80,9 @@ class TestLibrarianInstallDockerLogic:
             assert "aborted" in result.details
             mock_write.assert_not_called()
 
-    def test_run_install_fails_non_interactive_no_docker(self, paths: LibrarianPaths, tmp_path: Path):
+    def test_run_install_fails_non_interactive_no_docker(
+        self, paths: LibrarianPaths, tmp_path: Path
+    ):
         """Install fails gracefully if non-interactive and Docker is missing."""
         with (
             patch("shesha.librarian.cli._self_test_mcp_server", return_value=(True, "mcp: ok")),

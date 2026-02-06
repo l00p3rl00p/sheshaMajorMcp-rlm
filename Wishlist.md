@@ -63,3 +63,14 @@ Command execution with gates
 1. Do not replace the CLI.
 2. Do not invent new behavior beyond existing CLI and MCP tools.
 3. Do not persist secrets in the GUI.
+
+---
+
+**Plan: Make Ingestion UI Functional (Remove Demo-Only Limitation)**
+
+MATRIX
+1. **Bridge Required CLI Behavior**: Implement backend bridge endpoints for `librarian upload` (and `projects list/create` for target selection) with explicit confirmation gates.
+2. **UI Wiring**: Connect the ingestion screen to the bridge, including real file picker, project selector, and recursive toggle bound to CLI flags.
+3. **Validation + Preview**: Run a preflight check to validate file types against supported parsers and show a preview before execution.
+4. **Execution + Feedback**: Execute upload via the bridge, stream progress to the UI, and surface success/error states clearly.
+5. **Audit + Recovery**: Log each ingestion command and provide retry/rollback guidance on failure.

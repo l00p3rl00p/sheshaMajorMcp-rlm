@@ -6,6 +6,9 @@ install:
 test:
 	pytest -v
 
+gui-test:
+	cd gui && npm run test:ci
+
 lint:
 	ruff check src tests
 
@@ -16,4 +19,4 @@ format:
 	ruff format src tests
 	ruff check --fix src tests
 
-all: format lint typecheck test
+all: format lint typecheck test gui-test

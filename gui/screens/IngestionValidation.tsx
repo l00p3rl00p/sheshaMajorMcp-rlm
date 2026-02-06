@@ -28,6 +28,7 @@ export const IngestionValidationScreen: React.FC<Props> = ({ onNavigate }) => {
              <button 
                 onClick={() => onNavigate('data-ingestion')}
                 className="p-1 rounded-full hover:bg-white/10 text-gray-400"
+                title="Back to Data Ingestion"
              >
                 <ArrowLeft size={24} />
              </button>
@@ -36,13 +37,16 @@ export const IngestionValidationScreen: React.FC<Props> = ({ onNavigate }) => {
                 <p className="text-[10px] font-mono text-gray-500 tracking-wide">Batch ID: SHS-992-01X</p>
              </div>
          </div>
-         <button className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors">
+         <button className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors" title="Refresh validation (demo)">
             <RotateCcw size={18} />
          </button>
       </header>
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto px-4 py-6 space-y-6 custom-scrollbar">
+         <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-4 text-yellow-200 text-sm">
+           Validation UI is a demo. Use the CLI for real ingestion and verification.
+         </div>
          
          {/* Stats Cards */}
          <div className="grid grid-cols-3 gap-3">
@@ -82,7 +86,7 @@ export const IngestionValidationScreen: React.FC<Props> = ({ onNavigate }) => {
                      </div>
                      <div className="flex items-center gap-2">
                         <span className="px-2 py-1 rounded border border-red-500/30 bg-red-500/10 text-[10px] font-bold text-red-400 uppercase">INVALID</span>
-                        <button className="text-gray-500 hover:text-white"><MoreVertical size={16} /></button>
+                        <button className="text-gray-500 hover:text-white" title="More actions"><MoreVertical size={16} /></button>
                      </div>
                   </div>
                   
@@ -113,7 +117,7 @@ export const IngestionValidationScreen: React.FC<Props> = ({ onNavigate }) => {
                      <div className="w-6 h-6 rounded-full bg-[#059669] flex items-center justify-center text-black">
                         <CheckCircle2 size={16} />
                      </div>
-                     <button className="text-gray-500 hover:text-white"><MoreVertical size={16} /></button>
+                     <button className="text-gray-500 hover:text-white" title="More actions"><MoreVertical size={16} /></button>
                   </div>
                </div>
 
@@ -130,7 +134,7 @@ export const IngestionValidationScreen: React.FC<Props> = ({ onNavigate }) => {
                   </div>
                   <div className="flex items-center gap-2">
                      <span className="px-2 py-1 rounded border border-yellow-500/30 bg-yellow-500/10 text-[10px] font-bold text-yellow-500 uppercase">LARGE FILE</span>
-                     <button className="text-gray-500 hover:text-white"><MoreVertical size={16} /></button>
+                     <button className="text-gray-500 hover:text-white" title="More actions"><MoreVertical size={16} /></button>
                   </div>
                </div>
             </div>
@@ -140,7 +144,7 @@ export const IngestionValidationScreen: React.FC<Props> = ({ onNavigate }) => {
          <section>
             <div className="flex items-center justify-between mb-2">
                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide">Upload Plan Preview</h3>
-               <button className="text-[10px] font-bold text-[#7c3aed] flex items-center gap-1 hover:text-[#a78bfa]">
+               <button className="text-[10px] font-bold text-[#7c3aed] flex items-center gap-1 hover:text-[#a78bfa]" title="Copy JSON preview">
                   <Copy size={12} /> Copy JSON
                </button>
             </div>
@@ -165,16 +169,18 @@ export const IngestionValidationScreen: React.FC<Props> = ({ onNavigate }) => {
       {/* Footer Actions */}
       <footer className="p-4 bg-[#080c0a] border-t border-white/5 z-20 space-y-3">
          <div className="flex gap-3">
-            <button className="flex-1 bg-[#181820] border border-white/10 hover:bg-white/5 text-gray-300 py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-colors">
+            <button className="flex-1 bg-[#181820] border border-white/10 hover:bg-white/5 text-gray-300 py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-colors" title="Retry failed items (demo)">
                <RefreshCw size={14} /> Retry Failed
             </button>
-            <button className="flex-1 bg-[#181820] border border-white/10 hover:bg-white/5 text-gray-300 py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-colors">
+            <button className="flex-1 bg-[#181820] border border-white/10 hover:bg-white/5 text-gray-300 py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-colors" title="Ignore warnings (demo)">
                <EyeOff size={14} /> Ignore Warnings
             </button>
          </div>
          <button 
             onClick={() => onNavigate('dashboard')}
-            className="w-full bg-[#7c3aed] hover:bg-[#6d28d9] text-white py-4 rounded-xl font-bold text-sm tracking-wide shadow-[0_0_20px_rgba(124,58,237,0.4)] flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+            className="w-full bg-[#7c3aed]/40 text-white/60 py-4 rounded-xl font-bold text-sm tracking-wide shadow-[0_0_20px_rgba(124,58,237,0.2)] flex items-center justify-center gap-2 transition-all cursor-not-allowed"
+            title="Disabled in demo"
+            disabled
          >
             <Upload size={18} />
             Confirm Ingestion

@@ -99,6 +99,7 @@ export const CliReferenceScreen: React.FC<Props> = ({ onNavigate }) => {
             className="w-full bg-surface-dark border border-white/10 rounded-lg py-2.5 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all placeholder:text-gray-500 text-white" 
             placeholder="Search commands (e.g. install, query, upload)..." 
             type="text" 
+            title="Filter commands"
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden group-focus-within:flex">
             <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-white/10 rounded text-gray-400">⌘K</kbd>
@@ -108,19 +109,19 @@ export const CliReferenceScreen: React.FC<Props> = ({ onNavigate }) => {
 
       {/* Filter Chips */}
       <div className="flex gap-2 overflow-x-auto px-4 pb-3 no-scrollbar snap-x sticky top-[120px] z-30 bg-background-dark">
-        <button className="snap-start shrink-0 px-4 py-1.5 rounded-full bg-primary text-background-dark text-xs font-bold shadow-[0_0_20px_rgba(28,227,108,0.25)]">
+        <button className="snap-start shrink-0 px-4 py-1.5 rounded-full bg-primary text-background-dark text-xs font-bold shadow-[0_0_20px_rgba(28,227,108,0.25)]" title="Show all commands">
           All Commands
         </button>
-        <button className="snap-start shrink-0 px-4 py-1.5 rounded-full bg-surface-dark border border-white/10 hover:border-primary/50 text-gray-300 text-xs font-medium transition-colors">
+        <button className="snap-start shrink-0 px-4 py-1.5 rounded-full bg-surface-dark border border-white/10 hover:border-primary/50 text-gray-300 text-xs font-medium transition-colors" title="Filter install commands">
           Install
         </button>
-        <button className="snap-start shrink-0 px-4 py-1.5 rounded-full bg-surface-dark border border-white/10 hover:border-primary/50 text-gray-300 text-xs font-medium transition-colors">
+        <button className="snap-start shrink-0 px-4 py-1.5 rounded-full bg-surface-dark border border-white/10 hover:border-primary/50 text-gray-300 text-xs font-medium transition-colors" title="Filter MCP commands">
           MCP
         </button>
-        <button className="snap-start shrink-0 px-4 py-1.5 rounded-full bg-surface-dark border border-white/10 hover:border-primary/50 text-gray-300 text-xs font-medium transition-colors">
+        <button className="snap-start shrink-0 px-4 py-1.5 rounded-full bg-surface-dark border border-white/10 hover:border-primary/50 text-gray-300 text-xs font-medium transition-colors" title="Filter project management commands">
           Projects
         </button>
-        <button className="snap-start shrink-0 px-4 py-1.5 rounded-full bg-surface-dark border border-white/10 hover:border-primary/50 text-gray-300 text-xs font-medium transition-colors">
+        <button className="snap-start shrink-0 px-4 py-1.5 rounded-full bg-surface-dark border border-white/10 hover:border-primary/50 text-gray-300 text-xs font-medium transition-colors" title="Filter upload commands">
           Upload
         </button>
       </div>
@@ -142,7 +143,7 @@ export const CliReferenceScreen: React.FC<Props> = ({ onNavigate }) => {
 
               <div className="relative bg-[#0d1610] rounded-lg border border-white/5 p-3 group/code">
                 <div className="absolute right-2 top-2 opacity-0 group-hover/code:opacity-100 transition-opacity">
-                  <button className="p-1.5 rounded-md hover:bg-white/10 text-gray-400 hover:text-white transition-colors">
+                  <button className="p-1.5 rounded-md hover:bg-white/10 text-gray-400 hover:text-white transition-colors" title="Copy command">
                     <Copy size={16} />
                   </button>
                 </div>
@@ -178,7 +179,7 @@ export const CliReferenceScreen: React.FC<Props> = ({ onNavigate }) => {
         ))}
       </main>
 
-      <button className="fixed bottom-24 right-6 h-14 w-14 flex items-center justify-center bg-primary text-background-dark rounded-full shadow-[0_0_20px_rgba(28,227,108,0.4)] hover:scale-110 active:scale-95 transition-all z-40 group">
+      <button className="fixed bottom-24 right-6 h-14 w-14 flex items-center justify-center bg-primary text-background-dark rounded-full shadow-[0_0_20px_rgba(28,227,108,0.4)] hover:scale-110 active:scale-95 transition-all z-40 group" title="Export command list">
         <Download size={24} />
       </button>
 

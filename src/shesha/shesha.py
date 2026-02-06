@@ -58,7 +58,7 @@ class Shesha:
             keep_raw_files=config.keep_raw_files,
         )
         self._parser_registry = create_default_registry()
-        
+
         self._pool: ContainerPool | None = None
         if self._docker_available:
             self._pool = ContainerPool(
@@ -96,25 +96,30 @@ class Shesha:
     @staticmethod
     def _is_docker_available() -> bool:
         """Verify Docker daemon is running.
-        
+
         Uses context manager to ensure proper HTTP client cleanup.
         """
+        client = None
         try:
-            with docker.from_env() as client:
-                client.ping()  # Verify actual connectivity
+            client = docker.from_env()
+            client.ping()  # Verify actual connectivity
             return True
         except DockerException:
             return False
+        finally:
+            if client is not None:
+                client.close()
 
     @staticmethod
     def _check_docker_available() -> None:
         """Verify Docker daemon is running. Raises RuntimeError if not.
-        
+
         Uses context manager to ensure proper HTTP client cleanup.
         """
+        client = None
         try:
-            with docker.from_env() as client:
-                client.ping()  # Verify actual connectivity
+            client = docker.from_env()
+            client.ping()  # Verify actual connectivity
         except DockerException as e:
             error_str = str(e)
             if "Connection refused" in error_str:
@@ -126,9 +131,12 @@ class Shesha:
                     "No Docker-compatible socket found. "
                     "If you're using Podman, set DOCKER_HOST to Podman's socket:\n"
                     '  export DOCKER_HOST="unix://$(podman machine inspect '
-                    '"--format \'{{.ConnectionInfo.PodmanSocket.Path}}\')"'
+                    "\"--format '{{.ConnectionInfo.PodmanSocket.Path}}')\""
                 ) from e
             raise
+        finally:
+            if client is not None:
+                client.close()
 
     def create_project(self, project_id: str) -> Project:
         """Create a new project."""

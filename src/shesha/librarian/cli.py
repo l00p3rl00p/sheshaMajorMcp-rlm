@@ -8,7 +8,7 @@ import subprocess
 import sys
 import sysconfig
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +22,6 @@ from shesha.librarian.manifest import LibrarianManifest, SelfTestStatus
 from shesha.librarian.mcp_jsonrpc import encode_message, parse_messages
 from shesha.librarian.paths import LibrarianPaths, resolve_paths
 from shesha.sandbox.executor import ContainerExecutor
-
 
 SUPPORTED_MODES = ["cli", "mcp"]
 SUPPORTED_ENV_VARS = [
@@ -41,7 +40,7 @@ class InstallResult:
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def _default_manifest_dir() -> Path:
@@ -111,31 +110,35 @@ def _sandbox_source_dir() -> Path | None:
 
 def _ensure_sandbox_image(image: str) -> tuple[bool, str]:
     """Ensure the sandbox Docker image exists, building it if missing.
-    
+
     Uses context manager to guarantee Docker client cleanup.
     """
+    client = None
     try:
-        with docker.from_env() as client:
-            try:
-                client.images.get(image)
-                return True, "sandbox_image: present"
-            except ImageNotFound:
-                sandbox_dir = _sandbox_source_dir()
-                if sandbox_dir is None:
-                    return False, "Sandbox Dockerfile not found; cannot build image automatically."
+        client = docker.from_env()
+        try:
+            client.images.get(image)
+            return True, "sandbox_image: present"
+        except ImageNotFound:
+            sandbox_dir = _sandbox_source_dir()
+            if sandbox_dir is None:
+                return False, "Sandbox Dockerfile not found; cannot build image automatically."
 
-                try:
-                    client.images.build(
-                        path=str(sandbox_dir),
-                        dockerfile="Dockerfile",
-                        tag=image,
-                        rm=True,
-                    )
-                except Exception as e:  # noqa: BLE001 - surfaced to operator
-                    return False, f"Failed to build sandbox image '{image}': {e}"
-                return True, "sandbox_image: built"
+            try:
+                client.images.build(
+                    path=str(sandbox_dir),
+                    dockerfile="Dockerfile",
+                    tag=image,
+                    rm=True,
+                )
+            except Exception as e:  # noqa: BLE001 - surfaced to operator
+                return False, f"Failed to build sandbox image '{image}': {e}"
+            return True, "sandbox_image: built"
     except DockerException as e:
         return False, f"Docker unavailable: {e}"
+    finally:
+        if client is not None:
+            client.close()
 
 
 def _write_readme(*, path: Path, storage_path: Path, logs_path: Path, manifest_path: Path) -> None:
@@ -212,14 +215,14 @@ def _write_install_artifacts(
 
 def _perform_system_audit() -> tuple[bool, str]:
     """Audit the runtime environment (Python version, venv, dependencies).
-    
+
     Performs critical pre-flight checks before installation:
     1. Python version >= 3.11 (hard requirement)
     2. Virtual environment detection (strong recommendation)
-    
+
     Returns:
         (ok, details): ok=False stops installation; ok=True continues with warning if needed.
-    
+
     Security note: This function only reads system state (sys.version_info, sys.prefix).
     No external input is processed, so there are no injection risks.
     """
@@ -245,7 +248,7 @@ def _perform_system_audit() -> tuple[bool, str]:
         # Success message
         details = f"{env_msg}✓ Python v{major}.{minor} (ok)"
         return True, details
-    
+
     except Exception as e:  # noqa: BLE001 - defensive catch for unexpected system state
         # Fallback: if we can't determine version or venv status, proceed with warning
         # This should never happen but protects against unexpected platform issues
@@ -482,7 +485,9 @@ def run_install(
                 else:
                     print("  docker: still not detected. Proceeding with Docker disabled.")
             elif choice == "abort":
-                return InstallResult(ok=False, details="Installation aborted by user (Docker missing)")
+                return InstallResult(
+                    ok=False, details="Installation aborted by user (Docker missing)"
+                )
             elif choice == "skip":
                 print("  docker: skipped by user")
             else:
@@ -534,7 +539,9 @@ def run_install(
     # 3) Write manifest + readme.
     docker_status = "docker: skip" if not docker_available else "docker: ok"
     sandbox_status = "sandbox: skipped" if not docker_available or skip_sandbox else "sandbox: ok"
-    details = "; ".join([system_details.split("\n")[-1], mcp_details, docker_status, sandbox_status])
+    details = "; ".join(
+        [system_details.split("\n")[-1], mcp_details, docker_status, sandbox_status]
+    )
     status = SelfTestStatus(
         ok=True,
         timestamp=_utc_now_iso(),

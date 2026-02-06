@@ -31,6 +31,7 @@ export const DataIngestionScreen: React.FC<Props> = ({ onNavigate }) => {
              <button 
                 onClick={() => onNavigate('persistence')}
                 className="p-1 rounded-full hover:bg-white/10 text-gray-400"
+                title="Back to Persistence"
              >
                 <ArrowLeft size={24} />
              </button>
@@ -39,13 +40,16 @@ export const DataIngestionScreen: React.FC<Props> = ({ onNavigate }) => {
                 <p className="text-[10px] font-bold text-[#7c3aed] tracking-wider uppercase">Librarian Upload</p>
              </div>
          </div>
-         <button className="text-gray-400 hover:text-white transition-colors">
+         <button className="text-gray-400 hover:text-white transition-colors" title="Open settings">
             <Settings size={20} />
          </button>
       </header>
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto px-4 py-6 space-y-6 custom-scrollbar">
+         <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-4 text-yellow-200 text-sm">
+           Ingestion UI is a demo. Use the CLI <span className="font-mono text-yellow-100">librarian upload</span> command for real ingestion.
+         </div>
          
          {/* Validation Mode */}
          <section>
@@ -54,12 +58,14 @@ export const DataIngestionScreen: React.FC<Props> = ({ onNavigate }) => {
                <button 
                   onClick={() => setIngestionMode('STRICT')}
                   className={`flex-1 py-2 text-xs font-bold uppercase rounded-md transition-all ${ingestionMode === 'STRICT' ? 'bg-[#7c3aed] text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
+                  title="Use strict validation (UI only)"
                >
                   Strict
                </button>
                <button 
                   onClick={() => setIngestionMode('PERMISSIVE')}
                   className={`flex-1 py-2 text-xs font-bold uppercase rounded-md transition-all ${ingestionMode === 'PERMISSIVE' ? 'bg-[#7c3aed] text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
+                  title="Use permissive validation (UI only)"
                >
                   Permissive
                </button>
@@ -72,7 +78,7 @@ export const DataIngestionScreen: React.FC<Props> = ({ onNavigate }) => {
              <div>
                 <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Target Project</h3>
                 <div className="relative">
-                   <select className="w-full bg-[#181820] text-white border border-white/10 rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:border-[#7c3aed]">
+                   <select className="w-full bg-[#181820] text-white border border-white/10 rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:border-[#7c3aed]" title="Select target project (UI only)">
                       <option>alpha</option>
                       <option>beta</option>
                       <option>create-new</option>
@@ -85,12 +91,12 @@ export const DataIngestionScreen: React.FC<Props> = ({ onNavigate }) => {
                 <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Batch Notes (Local)</h3>
                 <div className="bg-[#181820] border border-white/10 rounded-xl p-2 flex flex-wrap gap-2 items-center min-h-[48px]">
                    <span className="flex items-center gap-1 bg-[#7c3aed]/20 text-[#a78bfa] border border-[#7c3aed]/30 px-2 py-1 rounded text-[10px] font-bold uppercase">
-                      PROD_X <button><X size={10} /></button>
+                      PROD_X <button title="Remove tag"><X size={10} /></button>
                    </span>
                    <span className="flex items-center gap-1 bg-[#7c3aed]/20 text-[#a78bfa] border border-[#7c3aed]/30 px-2 py-1 rounded text-[10px] font-bold uppercase">
-                      LEGACY <button><X size={10} /></button>
+                      LEGACY <button title="Remove tag"><X size={10} /></button>
                    </span>
-                   <input type="text" placeholder="Add note..." className="bg-transparent border-none outline-none text-sm text-white placeholder-gray-500 flex-1 min-w-[80px]" />
+                   <input type="text" placeholder="Add note..." className="bg-transparent border-none outline-none text-sm text-white placeholder-gray-500 flex-1 min-w-[80px]" title="Add a batch note (UI only)" />
                 </div>
              </div>
          </section>
@@ -107,7 +113,7 @@ export const DataIngestionScreen: React.FC<Props> = ({ onNavigate }) => {
                      Drag & drop files or folders to upload into the selected project
                   </p>
                </div>
-               <button className="bg-[#7c3aed] hover:bg-[#6d28d9] text-white px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wide shadow-lg transition-colors">
+               <button className="bg-[#7c3aed]/40 text-white/60 px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wide shadow-lg transition-colors cursor-not-allowed" disabled title="File picker disabled in demo">
                   Select Files
                </button>
             </div>
@@ -155,6 +161,7 @@ export const DataIngestionScreen: React.FC<Props> = ({ onNavigate }) => {
             <div 
                onClick={() => setGroupingLogic(!groupingLogic)}
                className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-colors ${groupingLogic ? 'bg-[#7c3aed]' : 'bg-gray-700'}`}
+               title="Toggle recursive upload (UI only)"
             >
                <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${groupingLogic ? 'translate-x-6' : 'translate-x-0'}`}></div>
             </div>
@@ -240,7 +247,9 @@ export const DataIngestionScreen: React.FC<Props> = ({ onNavigate }) => {
       <footer className="p-4 bg-[#080c0a] border-t border-white/5 z-20">
          <button 
             onClick={() => onNavigate('ingestion-validation')}
-            className="w-full bg-[#7c3aed] hover:bg-[#6d28d9] text-white py-4 rounded-xl font-bold text-sm tracking-wide shadow-[0_0_20px_rgba(124,58,237,0.4)] flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+            className="w-full bg-[#7c3aed]/40 text-white/60 py-4 rounded-xl font-bold text-sm tracking-wide shadow-[0_0_20px_rgba(124,58,237,0.2)] flex items-center justify-center gap-2 transition-all cursor-not-allowed"
+            title="Disabled in demo. Use librarian upload."
+            disabled
          >
             <Rocket size={18} fill="currentColor" />
             START INGESTION SEQUENCE

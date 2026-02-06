@@ -15,6 +15,13 @@ Prerequisites: Node.js (LTS).
 2. Start the dev server:
    `npm run dev`
 
+## Testing
+The GUI includes a comprehensive test suite using Vitest and React Testing Library.
+
+- Run all tests: `npm test`
+- Run tests in CI mode (single run): `npm run test:ci`
+- Note: GUI builds are gated by tests (`npm run build` executes `test:ci` first).
+
 The GUI is static scaffolding. It references real CLI/MCP commands but does not execute them directly.
 
 ## Canonical CLI Commands

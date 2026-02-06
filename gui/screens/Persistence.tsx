@@ -30,6 +30,7 @@ export const PersistenceScreen: React.FC<Props> = ({ onNavigate }) => {
           <button 
             onClick={() => onNavigate('dashboard')}
             className="text-white flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-white/10 transition-colors"
+            title="Back to Dashboard"
           >
             <ChevronLeft size={24} />
           </button>
@@ -64,6 +65,7 @@ export const PersistenceScreen: React.FC<Props> = ({ onNavigate }) => {
               className={`flex flex-col items-center justify-center border-b-[3px] pb-3 flex-1 transition-all capitalize ${
                 activeTab === tab ? 'border-primary text-white' : 'border-transparent text-gray-500 hover:text-white'
               }`}
+              title={`Show ${tab} view`}
             >
               <p className="text-sm font-bold">{tab}</p>
             </button>
@@ -136,7 +138,7 @@ export const PersistenceScreen: React.FC<Props> = ({ onNavigate }) => {
                   <HardDrive className="text-primary" />
                   Storage Locations
                 </h3>
-                <button className="text-primary hover:text-white transition-colors">
+                <button className="text-primary hover:text-white transition-colors" title="Refresh storage metrics">
                   <RefreshCw size={20} />
                 </button>
              </div>

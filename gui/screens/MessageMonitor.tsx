@@ -44,32 +44,32 @@ export const MessageMonitorScreen: React.FC<Props> = ({ onNavigate }) => {
 
       <header className="flex items-center justify-between px-4 py-4 relative z-20">
         <div className="flex items-center gap-3">
-           <button onClick={() => onNavigate('agent-center')} className="hover:bg-white/10 p-1 rounded-full transition-colors">
+           <button onClick={() => onNavigate('agent-center')} className="hover:bg-white/10 p-1 rounded-full transition-colors" title="Back to Agent Center">
               <ArrowLeft size={24} className="text-white" />
            </button>
            <h1 className="text-xl font-bold">Message Monitor</h1>
         </div>
-        <button className="text-gray-400 hover:text-white">
+        <button className="text-gray-400 hover:text-white" title="Open settings">
            <Settings size={24} />
         </button>
       </header>
 
       {/* Filters */}
       <div className="px-4 py-2 flex gap-2 overflow-x-auto no-scrollbar relative z-20">
-         <button onClick={() => setActiveFilter('LIVE')} className={getFilterClass('LIVE')}>
+         <button onClick={() => setActiveFilter('LIVE')} className={getFilterClass('LIVE')} title="Show live traffic">
             <span className={`w-1.5 h-1.5 rounded-full ${activeFilter === 'LIVE' ? 'bg-black' : 'bg-green-500'} animate-pulse`}></span>
             LIVE
          </button>
-         <button onClick={() => setActiveFilter('Docker')} className={getFilterClass('Docker')}>
+         <button onClick={() => setActiveFilter('Docker')} className={getFilterClass('Docker')} title="Filter Docker-related traffic">
             Docker
          </button>
-         <button onClick={() => setActiveFilter('Librarian')} className={getFilterClass('Librarian')}>
+         <button onClick={() => setActiveFilter('Librarian')} className={getFilterClass('Librarian')} title="Filter Librarian traffic">
             Librarian
          </button>
-         <button onClick={() => setActiveFilter('Success')} className={getFilterClass('Success', 'text-green-400', 'bg-green-500 text-black')}>
+         <button onClick={() => setActiveFilter('Success')} className={getFilterClass('Success', 'text-green-400', 'bg-green-500 text-black')} title="Filter successful responses">
             <CheckCircle2 size={12} /> Success
          </button>
-         <button onClick={() => setActiveFilter('Errors')} className={getFilterClass('Errors', 'text-red-400', 'bg-red-500 text-white')}>
+         <button onClick={() => setActiveFilter('Errors')} className={getFilterClass('Errors', 'text-red-400', 'bg-red-500 text-white')} title="Filter errors">
             Errors
          </button>
       </div>
@@ -106,6 +106,7 @@ export const MessageMonitorScreen: React.FC<Props> = ({ onNavigate }) => {
                   <div 
                     onClick={() => toggleNode(1)}
                     className={`bg-[#0a110d] border ${expandedNodes.has(1) ? 'border-green-500' : 'border-green-500/30'} rounded-lg p-3 shadow-[0_0_15px_rgba(34,197,94,0.1)] relative cursor-pointer transition-all`}
+                    title="Toggle response payload"
                   >
                      <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-green-500"></div>
                      <div className="flex justify-between items-start mb-1">
@@ -152,6 +153,7 @@ export const MessageMonitorScreen: React.FC<Props> = ({ onNavigate }) => {
                   <div 
                     onClick={() => toggleNode(2)}
                     className="bg-[#0a110d] border border-red-500/30 rounded-lg p-3 shadow-[0_0_15px_rgba(239,68,68,0.1)] relative cursor-pointer"
+                    title="Toggle error payload"
                   >
                      <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-red-500"></div>
                      <div className="flex justify-between items-start mb-1">
@@ -181,7 +183,7 @@ export const MessageMonitorScreen: React.FC<Props> = ({ onNavigate }) => {
 
       {/* FAB */}
       <div className="absolute bottom-6 right-6 z-30">
-         <button className="w-14 h-14 rounded-full bg-primary text-black shadow-[0_0_20px_rgba(28,227,108,0.5)] flex items-center justify-center hover:scale-105 active:scale-95 transition-transform">
+         <button className="w-14 h-14 rounded-full bg-primary text-black shadow-[0_0_20px_rgba(28,227,108,0.5)] flex items-center justify-center hover:scale-105 active:scale-95 transition-transform" title="Start new trace (demo)">
             <Play size={24} fill="currentColor" className="ml-1" />
          </button>
       </div>

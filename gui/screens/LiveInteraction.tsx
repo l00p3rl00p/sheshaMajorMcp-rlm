@@ -33,11 +33,12 @@ export const LiveInteractionScreen: React.FC<Props> = ({ onNavigate }) => {
            <button 
              onClick={() => onNavigate('agent-center')}
              className="flex items-center justify-center size-10 rounded-full hover:bg-white/10 transition-colors"
+             title="Back to Agent Center"
            >
              <ArrowLeft size={24} />
            </button>
            <h1 className="text-lg font-bold tracking-tight">Live Interaction</h1>
-           <button className="flex items-center justify-center size-10 rounded-full hover:bg-white/10 transition-colors">
+           <button className="flex items-center justify-center size-10 rounded-full hover:bg-white/10 transition-colors" title="Open settings">
              <Settings size={24} />
            </button>
         </div>
@@ -47,7 +48,7 @@ export const LiveInteractionScreen: React.FC<Props> = ({ onNavigate }) => {
            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
               <Zap size={16} className="text-primary" />
            </div>
-           <select className="appearance-none w-full bg-surface-dark border border-[#356448] text-white py-3 pl-12 pr-10 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm font-medium transition-all cursor-pointer">
+           <select className="appearance-none w-full bg-surface-dark border border-[#356448] text-white py-3 pl-12 pr-10 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm font-medium transition-all cursor-pointer" title="Select persona">
               <option value="devops">Persona: DevOps-01 (Active)</option>
               <option value="researcher">Persona: Research Lead</option>
            </select>
@@ -61,10 +62,11 @@ export const LiveInteractionScreen: React.FC<Props> = ({ onNavigate }) => {
            <button 
              onClick={() => onNavigate('operator-chat')}
              className="flex-1 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-colors"
+             title="Switch to chat view"
            >
              Chat View
            </button>
-           <button className="flex-1 py-2 rounded-lg bg-background-dark shadow-sm text-sm font-bold text-primary flex items-center justify-center gap-2 border border-[#356448]">
+           <button className="flex-1 py-2 rounded-lg bg-background-dark shadow-sm text-sm font-bold text-primary flex items-center justify-center gap-2 border border-[#356448]" title="Trace view (current)">
               <TerminalIcon size={16} /> Trace View
            </button>
         </div>
@@ -132,6 +134,7 @@ export const LiveInteractionScreen: React.FC<Props> = ({ onNavigate }) => {
                          <button 
                            onClick={() => setExpandedPayload(!expandedPayload)}
                            className="text-[10px] text-gray-500 hover:text-white underline mt-1"
+                           title={expandedPayload ? 'Collapse payload' : 'Expand payload'}
                          >
                            {expandedPayload ? 'Collapse Payload' : 'Expand Payload'}
                          </button>
@@ -164,17 +167,19 @@ export const LiveInteractionScreen: React.FC<Props> = ({ onNavigate }) => {
                <button 
                  onClick={() => setIsPaused(!isPaused)}
                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-xs font-bold uppercase tracking-wide ${isPaused ? 'bg-primary/10 text-primary border-primary/20' : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'}`}
+                 title={isPaused ? 'Resume trace stream' : 'Pause trace stream'}
                >
                   {isPaused ? <Play size={14} /> : <Pause size={14} />} {isPaused ? 'Resume' : 'Pause'}
                </button>
                <button 
                  onClick={clearLogs}
                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10 transition-all text-xs font-bold uppercase tracking-wide"
+                 title="Clear trace logs"
                >
                   <Trash2 size={14} /> Clear
                </button>
             </div>
-            <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-all text-xs font-bold uppercase tracking-wide">
+            <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-all text-xs font-bold uppercase tracking-wide" title="Save snapshot">
                <Save size={14} /> Snapshot
             </button>
          </div>
@@ -182,8 +187,8 @@ export const LiveInteractionScreen: React.FC<Props> = ({ onNavigate }) => {
             <div className="absolute left-3 text-primary flex items-center pointer-events-none">
                <Code size={20} />
             </div>
-            <input className="w-full bg-black/40 border border-[#356448] text-white pl-10 pr-12 py-3.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder:text-gray-500 text-sm font-mono" placeholder="Inject command or new goal..." type="text" />
-            <button className="absolute right-2 p-1.5 bg-primary text-black rounded-lg hover:bg-green-400 transition-colors shadow-[0_0_10px_rgba(28,227,108,0.4)]">
+            <input className="w-full bg-black/40 border border-[#356448] text-white pl-10 pr-12 py-3.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder:text-gray-500 text-sm font-mono" placeholder="Inject command or new goal..." type="text" title="Enter a new intent (read-only demo)" />
+            <button className="absolute right-2 p-1.5 bg-primary text-black rounded-lg hover:bg-green-400 transition-colors shadow-[0_0_10px_rgba(28,227,108,0.4)]" title="Send intent (demo)">
                <ArrowUp size={20} />
             </button>
          </div>

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Comprehensive automated testing suite for `/gui` using Vitest and React Testing Library.
+- GUI testing integration in root `Makefile` (`make gui-test`).
+- Global `ErrorBoundary` to `/gui` for increased UI resilience.
+- Canonical documentation hierarchy for `/gui` (ARCHITECTURE, USER_OUTCOMES, CHANGELOG).
+
+### Fixed
+- Regression: Converted Docker client context managers to `try/finally` for better platform compatibility and resource cleanup.
+- Audit Finding: Added error trapping for `FileReader` operations in the documentation upload screen.
+- Standardized documentation status in GUI code comments to clarify prototype vs. production behavior.
+
 ## [0.4.0] - 2026-02-05
 
 ### Added

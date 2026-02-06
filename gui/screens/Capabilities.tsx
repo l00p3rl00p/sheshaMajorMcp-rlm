@@ -26,7 +26,7 @@ export const CapabilitiesScreen: React.FC<Props> = ({ onNavigate }) => {
       <AppHeader 
         title="Capability Discovery" 
         rightAction={
-          <button className="text-gray-400 hover:text-primary transition-colors p-2 rounded-full hover:bg-white/5">
+          <button className="text-gray-400 hover:text-primary transition-colors p-2 rounded-full hover:bg-white/5" title="Capability settings">
             <Settings size={20} />
           </button>
         }
@@ -90,10 +90,10 @@ export const CapabilitiesScreen: React.FC<Props> = ({ onNavigate }) => {
                    </p>
                  </div>
                </div>
-               <button className="w-full sm:w-auto mt-2 sm:mt-0 px-4 py-2 bg-amber-900/30 text-amber-400 text-sm font-semibold rounded-lg hover:bg-amber-900/50 transition-colors flex items-center justify-center gap-2">
-                 <span>View Map</span>
-                 <ArrowRight size={16} />
-               </button>
+             <button className="w-full sm:w-auto mt-2 sm:mt-0 px-4 py-2 bg-amber-900/30 text-amber-400 text-sm font-semibold rounded-lg hover:bg-amber-900/50 transition-colors flex items-center justify-center gap-2" title="View degraded capability map">
+               <span>View Map</span>
+               <ArrowRight size={16} />
+             </button>
            </div>
         </section>
 

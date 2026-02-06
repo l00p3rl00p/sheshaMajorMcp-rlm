@@ -45,4 +45,3 @@ def test_resolve_paths_allows_custom_log_dir(monkeypatch, tmp_path: Path) -> Non
 
     assert paths.storage == home / "storage"
     assert paths.logs == log_dir
-

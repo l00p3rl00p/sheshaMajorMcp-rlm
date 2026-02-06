@@ -52,4 +52,3 @@ def resolve_paths() -> LibrarianPaths:
     logs_dir = Path(logs_env).expanduser() if logs_env else (home_dir / "logs")
 
     return LibrarianPaths(home=home_dir, storage=storage_dir, logs=logs_dir)
-

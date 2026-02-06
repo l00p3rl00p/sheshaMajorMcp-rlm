@@ -69,10 +69,10 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         </section>
 
         {/* System Environment */}
-        <section className="space-y-3 cursor-pointer" onClick={() => onNavigate('persistence')}>
+        <section className="space-y-3 cursor-pointer" onClick={() => onNavigate('persistence')} title="Open Persistence Manager">
           <div className="flex items-center justify-between px-1">
             <h3 className="text-sm font-semibold uppercase tracking-tight">System Environment</h3>
-            <button className="text-xs text-primary hover:underline">Edit Config</button>
+            <button className="text-xs text-primary hover:underline" title="Review configuration paths">Edit Config</button>
           </div>
           <div className="rounded-xl bg-surface-dark border border-border-dark overflow-hidden hover:border-primary/30 transition-colors">
             <div className="p-4 border-b border-border-dark/50 flex flex-col gap-1">
@@ -139,6 +139,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         <button 
           onClick={() => onNavigate('agent-center')}
           className="flex items-center justify-center h-12 w-12 rounded-full bg-primary text-background-dark shadow-lg shadow-primary/30 active:scale-95 transition-transform hover:bg-white hover:text-black"
+          title="Open Agent Center"
         >
           <Bolt size={24} fill="currentColor" />
         </button>

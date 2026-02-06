@@ -46,6 +46,7 @@ export const PromptPreviewScreen: React.FC<Props> = ({ onNavigate }) => {
          <button 
             onClick={() => onNavigate('staging-area')}
             className="p-1 rounded-full hover:bg-white/10 text-gray-400"
+            title="Close preview"
          >
             <X size={24} />
          </button>
@@ -124,6 +125,7 @@ export const PromptPreviewScreen: React.FC<Props> = ({ onNavigate }) => {
                <button 
                  onClick={handleCopy}
                  className={`flex items-center gap-1 text-[10px] font-bold uppercase transition-colors ${copied ? 'text-green-400' : 'text-purple-400 hover:text-purple-300'}`}
+                 title="Copy compiled prompt"
                >
                   {copied ? <Check size={12} /> : <Copy size={12} />}
                   {copied ? 'Copied' : 'Copy Raw'}
@@ -145,18 +147,20 @@ export const PromptPreviewScreen: React.FC<Props> = ({ onNavigate }) => {
       {/* Footer Actions */}
       <footer className="flex-none p-4 bg-[#121218] border-t border-white/5 z-20">
          <div className="flex gap-3">
-            <button 
-               onClick={() => onNavigate('staging-area')}
-               className="flex-1 py-3.5 rounded-xl border border-white/10 text-gray-300 font-bold text-sm hover:bg-white/5 transition-colors flex items-center justify-center gap-2"
-            >
+           <button 
+              onClick={() => onNavigate('staging-area')}
+              className="flex-1 py-3.5 rounded-xl border border-white/10 text-gray-300 font-bold text-sm hover:bg-white/5 transition-colors flex items-center justify-center gap-2"
+              title="Return to staging"
+           >
                <ChevronLeft size={18} />
                Edit
             </button>
-            <button 
-               onClick={handleExecute}
-               disabled={isExecuting}
-               className="flex-[2] bg-[#7c3aed] hover:bg-[#6d28d9] text-white py-3.5 rounded-xl font-bold text-sm tracking-wide shadow-[0_0_20px_rgba(124,58,237,0.4)] flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-wait"
-            >
+           <button 
+              onClick={handleExecute}
+              disabled={isExecuting}
+              className="flex-[2] bg-[#7c3aed] hover:bg-[#6d28d9] text-white py-3.5 rounded-xl font-bold text-sm tracking-wide shadow-[0_0_20px_rgba(124,58,237,0.4)] flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-wait"
+              title="Execute via RLM (demo)"
+           >
                {isExecuting ? (
                  <>
                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
