@@ -273,9 +273,11 @@ class Shesha:
 
     def _extract_repo_name(self, url: str) -> str:
         """Extract repository name from URL."""
+        cleaned = url.rstrip("/")
         if self._repo_ingester.is_local_path(url):
-            return Path(url).expanduser().name
-        match = re.search(r"[/:]([^/]+/[^/]+?)(?:\.git)?$", url)
+            path = Path(cleaned).expanduser()
+            return f"{path.parent.name}-{path.name}"
+        match = re.search(r"[/:]([^/]+/[^/]+?)(?:\.git)?$", cleaned)
         if match:
             return match.group(1).replace("/", "-")
         return "unnamed-repo"

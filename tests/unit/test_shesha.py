@@ -518,3 +518,71 @@ class TestGetProjectInfo:
                 shesha.get_project_info("nonexistent")
 
             assert "does not exist" in str(exc_info.value)
+
+
+class TestExtractRepoName:
+    """Tests for _extract_repo_name method."""
+
+    def _make_shesha(self, tmp_path: Path, is_local: bool = False) -> Shesha:
+        """Create a Shesha instance with mocked Docker and RepoIngester."""
+        with patch("shesha.shesha.docker"), patch("shesha.shesha.ContainerPool"):
+            with patch("shesha.shesha.RepoIngester") as mock_ingester_cls:
+                mock_ingester = MagicMock()
+                mock_ingester_cls.return_value = mock_ingester
+                mock_ingester.is_local_path.return_value = is_local
+                shesha = Shesha(model="test-model", storage_path=tmp_path)
+        return shesha
+
+    def test_https_url(self, tmp_path: Path):
+        """Standard HTTPS GitHub URL extracts org-repo name."""
+        shesha = self._make_shesha(tmp_path)
+        assert shesha._extract_repo_name("https://github.com/Ovid/shesha") == "Ovid-shesha"
+
+    def test_https_url_trailing_slash(self, tmp_path: Path):
+        """HTTPS URL with trailing slash extracts org-repo name."""
+        shesha = self._make_shesha(tmp_path)
+        assert shesha._extract_repo_name("https://github.com/Ovid/shesha/") == "Ovid-shesha"
+
+    def test_https_url_dot_git(self, tmp_path: Path):
+        """HTTPS URL with .git suffix extracts org-repo name."""
+        shesha = self._make_shesha(tmp_path)
+        assert shesha._extract_repo_name("https://github.com/Ovid/shesha.git") == "Ovid-shesha"
+
+    def test_https_url_dot_git_trailing_slash(self, tmp_path: Path):
+        """HTTPS URL with .git and trailing slash extracts org-repo name."""
+        shesha = self._make_shesha(tmp_path)
+        assert (
+            shesha._extract_repo_name("https://github.com/Ovid/shesha.git/") == "Ovid-shesha"
+        )
+
+    def test_ssh_url(self, tmp_path: Path):
+        """SSH git URL extracts org-repo name."""
+        shesha = self._make_shesha(tmp_path)
+        assert shesha._extract_repo_name("git@github.com:Ovid/shesha.git") == "Ovid-shesha"
+
+    def test_gitlab_url(self, tmp_path: Path):
+        """GitLab URL extracts org-repo name."""
+        shesha = self._make_shesha(tmp_path)
+        assert (
+            shesha._extract_repo_name("https://gitlab.com/myorg/myrepo") == "myorg-myrepo"
+        )
+
+    def test_local_path_uses_parent_and_name(self, tmp_path: Path):
+        """Local path extracts parent-name to avoid collisions."""
+        shesha = self._make_shesha(tmp_path, is_local=True)
+        assert shesha._extract_repo_name("/home/user/projects/shesha") == "projects-shesha"
+
+    def test_local_home_relative_path(self, tmp_path: Path):
+        """Home-relative local path extracts parent-name."""
+        shesha = self._make_shesha(tmp_path, is_local=True)
+        assert shesha._extract_repo_name("~/projects/myrepo") == "projects-myrepo"
+
+    def test_local_path_trailing_slash(self, tmp_path: Path):
+        """Local path with trailing slash extracts parent-name."""
+        shesha = self._make_shesha(tmp_path, is_local=True)
+        assert shesha._extract_repo_name("/home/user/projects/shesha/") == "projects-shesha"
+
+    def test_fallback_for_unparseable_url(self, tmp_path: Path):
+        """Unparseable URL falls back to unnamed-repo."""
+        shesha = self._make_shesha(tmp_path)
+        assert shesha._extract_repo_name("not-a-url") == "unnamed-repo"
