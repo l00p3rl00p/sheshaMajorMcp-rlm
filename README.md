@@ -38,7 +38,7 @@ To connect Shesha to an MCP client (like Claude Desktop or Cursor), use this con
   }
 }
 ```
-*Note: The `librarian install` command generates a file (`mcp-server-readme.md`) with the **exact** path for your machine.*
+*Note: The `librarian install` command generates a file (`mcp-server-readme.md`) with the **exact** path for your machine. For more details on supported models and API keys, see [**docs/ENVIRONMENT.md**](./docs/ENVIRONMENT.md).*
 
 ### What the installer does for you:
 *   **System Audit**: Verifies Python 3.11+ (exits with clear error if older) and checks if you're in a virtual environment (provides setup guidance if not).

@@ -176,7 +176,7 @@ To connect Shesha to an MCP client (like Claude Desktop or Cursor), add the foll
 }}
 ```
 
-**Note:** Replace `YOUR_API_KEY_HERE` with your actual API key.
+**Note:** Replace `YOUR_API_KEY_HERE` with your actual API key. For a list of supported models and provider examples, see [**docs/ENVIRONMENT.md**](./docs/ENVIRONMENT.md).
 
 ## Persistent state + logs
 
