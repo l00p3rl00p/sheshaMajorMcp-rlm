@@ -1,65 +1,3 @@
-# Quick Start: Installation & Setup
-
-**The simplest way to get started:**
-
-1. Clone the repo
-2. cd into it
-3. Install dependencies (pip install -e ".[dev]")
-4. Run the installer (librarian install)
-
-If you want to be more explict. 
-
-```bash
-git clone https://github.com/l00p3rl00p/sheshaMajorMcp-rlm.git
-cd sheshaMajorMcp-rlm
-pip install -e ".[dev]"
-python -m shesha.librarian install
-```
-
-That's it! The installer will guide you through everything automatically.
-
-**Next Step**: Read [**docs/GETTING_STARTED.md**](./docs/GETTING_STARTED.md) to perform your first codebase research.
-
-### What the installer does for you:
-*   **System Audit**: Verifies Python 3.11+ (exits with clear error if older) and checks if you're in a virtual environment (provides setup guidance if not).
-*   **Infrastructure Check**: Detects if Docker is running (required for secure code sandboxing).
-*   **Interactive Guidance**: If Docker is missing, provides platform-specific installation instructions (Docker Desktop, Homebrew, Colima) and lets you choose to install, skip, or abort.
-*   **Complete Setup**: Creates local storage/log directories and writes `.librarian/manifest.json` with your system status.
-
-**Prerequisites**: Python 3.11+ and Docker (highly recommended for queries, though you can skip it for indexing-only use).
-
----
-
-<details>
-<summary><b>Manual Setup (Advanced)</b></summary>
-
-If you prefer more control over the installation process:
-
-### 1. Clone and Prepare Environment
-```bash
-git clone https://github.com/l00p3rl00p/sheshaMajorMcp-rlm.git
-cd sheshaMajorMcp-rlm
-
-# Create and activate a virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-### 2. Install Dependencies
-```bash
-pip install -e ".[dev]"
-```
-
-### 3. Run the Librarian Installer
-```bash
-python -m shesha.librarian install
-```
-
-</details>
-
-
----
-
 # Shesha
 
 <p align="center">
@@ -72,11 +10,83 @@ Shesha lets AI explore your documents, [even large codebases](examples/repo.py),
 
 **Why this matters:** [Recursive Language Models (RLMs)](https://arxiv.org/abs/2512.24601) give LLMs effectively unlimited context and dramatically better long-horizon reasoning. The AI writes Python code to actively explore your documents in a secure sandbox, iterating until confident in the answer—no context window limits, no lost information.
 
-See [Sample Session](#sample-session) for a demo: tracking 30 chronological events across 7 novels with supporting quotes.
+---
 
-## Alpha Code
+## ⚡ Quick Start
+
+**The simplest way to get started:**
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/l00p3rl00p/sheshaMajorMcp-rlm.git
+
+# 2. Enter the project directory
+cd sheshaMajorMcp-rlm
+
+# 3. Install dependencies
+pip install -e ".[dev]"
+
+# 4. Run the installer
+python -m shesha.librarian install
+```
+
+That's it! The installer will guide you through everything automatically.
+
+**Next Step**: Read [**docs/GETTING_STARTED.md**](./docs/GETTING_STARTED.md) to perform your first codebase research.
+
+---
+
+## 📋 Table of Contents
+
+1. [What the Installer Does](#what-the-installer-does)
+2. [Prerequisites](#prerequisites)
+3. [Alpha Code Notice](#alpha-code-notice)
+4. [Optional GUI (Operator Dashboard)](#optional-gui-operator-dashboard)
+5. [Supported LLM Providers](#supported-llm-providers)
+6. [Installation](#installation)
+7. [Librarian (CLI + MCP Server)](#librarian-cli--mcp-server)
+8. [Build the Sandbox Container](#build-the-sandbox-container)
+9. [Configuration](#configuration)
+10. [Quick Start Examples](#quick-start-examples)
+11. [Try the Barsoom Example](#try-the-barsoom-example)
+12. [Analyzing Codebases](#analyzing-codebases)
+13. [How It Works](#how-it-works)
+14. [Supported Document Formats](#supported-document-formats)
+15. [Running Tests](#running-tests)
+16. [Architecture & Development](#architecture--development)
+17. [Project Structure](#project-structure)
+18. [Sample Session](#sample-session)
+19. [Security](#security)
+20. [Who is Shesha?](#who-is-shesha)
+21. [License](#license)
+22. [Author](#author)
+
+---
+
+## What the Installer Does
+
+The installer automates the complete setup process:
+
+* **System Audit**: Verifies Python 3.11+ (exits with clear error if older) and checks if you're in a virtual environment (provides setup guidance if not).
+* **Infrastructure Check**: Detects if Docker is running (required for secure code sandboxing).
+* **Interactive Guidance**: If Docker is missing, provides platform-specific installation instructions (Docker Desktop, Homebrew, Colima) and lets you choose to install, skip, or abort.
+* **Complete Setup**: Creates local storage/log directories and writes `.librarian/manifest.json` with your system status.
+
+---
+
+## Prerequisites
+
+* **Python:** 3.11+
+* **Docker:** Required for code execution; optional for indexing/management
+* **LLM API Key:** Or local Ollama installation
+
+---
+
+## Alpha Code Notice
 
 So far it seems to work, but it's only been tested with .txt documents and the OpenAI API. It _should_ support PDFs, Word Documents, and other files. Your mileage may vary.
+
+---
 
 ## Optional GUI (Operator Dashboard)
 
@@ -88,11 +98,7 @@ npm install
 npm run dev
 ```
 
-## Prerequisites
-
-- Python 3.11+
-- Docker (required for code execution; optional for indexing/management)
-- An LLM API key (or local Ollama installation)
+---
 
 ## Supported LLM Providers
 
@@ -124,6 +130,8 @@ ollama pull llama3
 shesha = Shesha(model="ollama/llama3")
 ```
 
+---
+
 ## Installation
 
 ### From PyPI (when published)
@@ -133,7 +141,6 @@ pip install shesha
 ```
 
 ### From Source
-
 
 ```bash
 git clone https://github.com/l00p3rl00p/sheshaMajorMcp-rlm.git
@@ -146,6 +153,35 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 # Install with dev dependencies
 pip install -e ".[dev]"
 ```
+
+<details>
+<summary><b>Manual Setup (Advanced)</b></summary>
+
+If you prefer more control over the installation process:
+
+### 1. Clone and Prepare Environment
+```bash
+git clone https://github.com/l00p3rl00p/sheshaMajorMcp-rlm.git
+cd sheshaMajorMcp-rlm
+
+# Create and activate a virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 2. Install Dependencies
+```bash
+pip install -e ".[dev]"
+```
+
+### 3. Run the Librarian Installer
+```bash
+python -m shesha.librarian install
+```
+
+</details>
+
+---
 
 ## Librarian (CLI + MCP Server)
 
@@ -176,7 +212,9 @@ Override state locations with:
 - `LIBRARIAN_STORAGE_PATH`
 - `LIBRARIAN_LOG_DIR`
 
-### Build the Sandbox Container
+---
+
+## Build the Sandbox Container
 
 The sandbox container is required for code execution:
 
@@ -190,6 +228,8 @@ Verify the build:
 echo '{"action": "ping"}' | docker run -i --rm shesha-sandbox
 # Should output: {"status": "ok", "message": "pong"}
 ```
+
+---
 
 ## Configuration
 
@@ -247,7 +287,9 @@ container_memory_mb: 1024
 execution_timeout_sec: 60
 ```
 
-## Quick Start
+---
+
+## Quick Start Examples
 
 ```python
 from shesha import Shesha
@@ -273,7 +315,9 @@ for step in result.trace.steps:
     print(f"[{step.type.value}] {step.content[:100]}...")
 ```
 
-## Try the Example
+---
+
+## Try the Barsoom Example
 
 The repo includes an interactive example that lets you query the Barsoom novels (Edgar Rice Burroughs' Mars series, public domain):
 
@@ -310,6 +354,8 @@ Use `--verbose` for execution stats, or `--prompt "question"` for non-interactiv
 python examples/barsoom.py --verbose
 python examples/barsoom.py --prompt "How does John Carter travel to Mars?"
 ```
+
+---
 
 ## Analyzing Codebases
 
@@ -395,6 +441,8 @@ Command line options:
 python examples/repo.py https://github.com/org/repo --update --verbose
 ```
 
+---
+
 ## How It Works
 
 1. **Upload**: Documents are parsed and stored in a project
@@ -406,6 +454,8 @@ python examples/repo.py https://github.com/org/repo --update --verbose
 
 For large documents, the LLM can use `llm_query(instruction, content)` to delegate analysis to a sub-LLM call.
 
+---
+
 ## Supported Document Formats
 
 | Category | Extensions |
@@ -413,6 +463,8 @@ For large documents, the LLM can use `llm_query(instruction, content)` to delega
 | Text | `.txt`, `.md`, `.csv` |
 | Code | `.py`, `.js`, `.ts`, `.go`, `.rs`, `.java`, `.c`, `.cpp`, `.h`, `.hpp` |
 | Documents | `.pdf`, `.docx`, `.html` |
+
+---
 
 ## Running Tests
 
@@ -439,9 +491,13 @@ ruff format src tests
 make all
 ```
 
+---
+
 ## Architecture & Development
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the technical manual, development workflow, and security model.
+
+---
 
 ## Project Structure
 
@@ -466,6 +522,8 @@ src/shesha/
     ├── prompts.py       # Hardened system prompts
     └── trace.py         # Execution tracing
 ```
+
+---
 
 ## Sample Session
 
@@ -527,6 +585,8 @@ The son of Dejah Thoris and John Carter is **Carthoris of Helium**.
 
 The third question demonstrates RLM's strength for complex reasoning: it searched across all 7 novels (~2.8M characters), extracted 30 chronological events with supporting quotes, and identified a continuity conflict between books—the kind of long-context sequential analysis that typically trips up standard LLM approaches.
 
+---
+
 ## Security
 
 See [SECURITY.md](SECURITY.md) for details on:
@@ -535,14 +595,19 @@ See [SECURITY.md](SECURITY.md) for details on:
 - Docker sandbox isolation
 - Network policies
 
+---
+
 ## Who is Shesha?
 
 [Shesha](https://en.wikipedia.org/wiki/Shesha), also known as Ananta, is a Hindu deity who embodies the concept of infinity and the eternal cycle of existence. He is famously depicted with a thousand heads that support the planets of the universe, representing a foundational stability that allows for the maintenance of vast, complex structures. As the celestial couch of the preserver deity Vishnu, he remains constant even as the world undergoes cycles of creation and dissolution, mirroring the ability of recursive models to manage essentially unbounded-length reasoning chains.
 
+---
 
 ## License
 
 MIT - see [LICENSE](LICENSE)
+
+---
 
 ## Author
 
