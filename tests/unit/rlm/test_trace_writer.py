@@ -477,9 +477,7 @@ class TestIncrementalTraceWriter:
         summary = json.loads(lines[-1])
         assert summary["status"] == "interrupted"
 
-    def test_steps_are_redacted(
-        self, storage: FilesystemStorage, context: QueryContext
-    ) -> None:
+    def test_steps_are_redacted(self, storage: FilesystemStorage, context: QueryContext) -> None:
         """Secrets in step content are redacted before writing."""
         from shesha.rlm.trace_writer import IncrementalTraceWriter
 

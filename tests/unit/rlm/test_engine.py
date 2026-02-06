@@ -359,9 +359,7 @@ class TestEngineTraceWriting:
         assert header["type"] == "header"
 
         # Should have at least the steps from iteration 0
-        step_lines = [
-            json.loads(line) for line in lines[1:] if json.loads(line)["type"] == "step"
-        ]
+        step_lines = [json.loads(line) for line in lines[1:] if json.loads(line)["type"] == "step"]
         assert len(step_lines) >= 1
 
         # Should have summary with interrupted status
