@@ -51,6 +51,7 @@ class MultiRepoAnalyzer:
         self._repos: list[str] = []
         self._summaries: dict[str, RepoSummary] = {}
         self._impacts: dict[str, ImpactReport] = {}
+        self._failed_repos: dict[str, str] = {}
 
     @property
     def repos(self) -> list[str]:
@@ -67,7 +68,12 @@ class MultiRepoAnalyzer:
         """Impact reports by project_id (populated after Phase 2)."""
         return self._impacts
 
-    def add_repo(self, url_or_path: str) -> str:
+    @property
+    def failed_repos(self) -> dict[str, str]:
+        """Repos that failed to add, with error messages."""
+        return self._failed_repos
+
+    def add_repo(self, url_or_path: str) -> str | None:
         """Add a repo to the analysis.
 
         If the repo was previously indexed, reuses it (with update check).
@@ -77,21 +83,25 @@ class MultiRepoAnalyzer:
             url_or_path: Git repository URL or local filesystem path.
 
         Returns:
-            The project_id for the added repository.
+            The project_id for the added repository, or None if failed.
         """
-        result = self._shesha.create_project_from_repo(url_or_path)
+        try:
+            result = self._shesha.create_project_from_repo(url_or_path)
 
-        # Apply updates if available
-        if result.status == "updates_available":
-            result = result.apply_updates()
+            # Apply updates if available
+            if result.status == "updates_available":
+                result = result.apply_updates()
 
-        project_id = result.project.project_id
+            project_id = result.project.project_id
 
-        # Avoid duplicates
-        if project_id not in self._repos:
-            self._repos.append(project_id)
+            # Avoid duplicates
+            if project_id not in self._repos:
+                self._repos.append(project_id)
 
-        return project_id
+            return project_id
+        except Exception as e:
+            self._failed_repos[url_or_path] = str(e)
+            return None
 
     def _load_prompt(self, name: str) -> str:
         """Load a prompt template from the prompts directory."""
@@ -329,6 +339,16 @@ class MultiRepoAnalyzer:
             discovery_round += 1
             if not discovered:
                 break
+
+        # Check context size before synthesis
+        total_context_size = sum(len(report.raw_analysis) for report in self._impacts.values())
+        if total_context_size > 500_000:  # 500KB warning threshold
+            if on_progress:
+                on_progress(
+                    "synthesize",
+                    f"Warning: Large context ({total_context_size:,} chars). "
+                    "Consider reducing number of repos.",
+                )
 
         # Phase 3: Synthesize
         if on_progress:

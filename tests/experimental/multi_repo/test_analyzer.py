@@ -578,3 +578,103 @@ class TestMultiRepoAnalyzerAnalyze:
         assert "impact" in phases_reported
         assert "synthesize" in phases_reported
         assert "align" in phases_reported
+
+
+class TestMultiRepoAnalyzerErrorHandling:
+    """Tests for error handling."""
+
+    def test_add_repo_failure_is_tracked(self):
+        """add_repo tracks failures without raising."""
+        mock_shesha = MagicMock()
+        mock_shesha.create_project_from_repo.side_effect = Exception("Clone failed")
+
+        analyzer = MultiRepoAnalyzer(mock_shesha)
+        project_id = analyzer.add_repo("https://github.com/org/bad-repo")
+
+        assert project_id is None
+        assert "https://github.com/org/bad-repo" in analyzer.failed_repos
+        assert len(analyzer.repos) == 0
+
+    def test_analyze_warns_on_large_context(self):
+        """analyze warns when context approaches limits."""
+        mock_shesha = MagicMock()
+        mock_project = MagicMock()
+        mock_project.project_id = "test-repo"
+
+        # Create a very large impact analysis
+        large_analysis = "x" * 600_000  # > 500KB
+
+        recon_result = MagicMock()
+        recon_result.answer = json.dumps(
+            {
+                "apis": [],
+                "models": [],
+                "entry_points": [],
+                "dependencies": [],
+            }
+        )
+
+        impact_result = MagicMock()
+        impact_result.answer = (
+            json.dumps(
+                {
+                    "affected": True,
+                    "changes": [],
+                    "new_interfaces": [],
+                    "modified_interfaces": [],
+                    "discovered_dependencies": [],
+                }
+            )
+            + large_analysis
+        )
+
+        synth_result = MagicMock()
+        synth_result.answer = (
+            json.dumps(
+                {
+                    "component_changes": {},
+                    "data_flow": "",
+                    "interface_contracts": [],
+                    "implementation_sequence": [],
+                    "open_questions": [],
+                }
+            )
+            + "\n# HLD"
+        )
+
+        align_result = MagicMock()
+        align_result.answer = json.dumps(
+            {
+                "covered": [],
+                "gaps": [],
+                "scope_creep": [],
+                "alignment_score": 1.0,
+                "recommendation": "approved",
+            }
+        )
+
+        mock_project.query.side_effect = [
+            recon_result,
+            impact_result,
+            synth_result,
+            align_result,
+        ]
+        mock_shesha.get_project.return_value = mock_project
+
+        progress_messages = []
+
+        def on_progress(phase: str, message: str) -> None:
+            progress_messages.append((phase, message))
+
+        analyzer = MultiRepoAnalyzer(mock_shesha)
+        analyzer._repos = ["test-repo"]
+
+        analyzer.analyze("PRD", on_progress=on_progress)
+
+        # Should have a warning about context size
+        warning_found = any(
+            "large" in msg.lower() or "context" in msg.lower()
+            for phase, msg in progress_messages
+            if phase == "synthesize"
+        )
+        assert warning_found, f"Expected context warning, got: {progress_messages}"
