@@ -1,3 +1,85 @@
+# Quick Start: Installation & Setup
+
+**The simplest way to get started:**
+
+1. Clone the repo
+2. cd into it
+3. Install dependencies (pip install -e ".[dev]")
+4. Run the installer (librarian install)
+
+If you want to be more explict. 
+
+```bash
+git clone https://github.com/l00p3rl00p/sheshaMajorMcp-rlm.git
+cd sheshaMajorMcp-rlm
+pip install -e ".[dev]"
+python -m shesha.librarian install
+```
+
+That's it! The installer will guide you through everything automatically.
+
+**Next Step**: Read [**docs/GETTING_STARTED.md**](./docs/GETTING_STARTED.md) to perform your first codebase research.
+
+### 🔌 MCP Client Configuration (Generic Example)
+
+To connect Shesha to an MCP client (like Claude Desktop or Cursor), use this configuration template:
+
+```json
+{
+  "mcpServers": {
+    "shesha": {
+      "command": "/path/to/your/venv/bin/python",
+      "args": ["-m", "shesha.librarian", "mcp"],
+      "env": {
+        "ANY_PROVIDER_API_KEY": "YOUR_KEY_HERE",
+        "SHESHA_MODEL": "your-preferred-model"
+      }
+    }
+  }
+}
+```
+*Note: The `librarian install` command generates a file (`mcp-server-readme.md`) with the **exact** path for your machine. For more details on supported models and API keys, see [**docs/ENVIRONMENT.md**](./docs/ENVIRONMENT.md).*
+
+### What the installer does for you:
+*   **System Audit**: Verifies Python 3.11+ (exits with clear error if older) and checks if you're in a virtual environment (provides setup guidance if not).
+*   **Infrastructure Check**: Detects if Docker is running (required for secure code sandboxing).
+*   **Interactive Guidance**: If Docker is missing, provides platform-specific installation instructions (Docker Desktop, Homebrew, Colima) and lets you choose to install, skip, or abort.
+*   **Complete Setup**: Creates local storage/log directories and writes `.librarian/manifest.json` with your system status.
+
+**Prerequisites**: Python 3.11+ and Docker (highly recommended for queries, though you can skip it for indexing-only use).
+
+---
+
+<details>
+<summary><b>Manual Setup (Advanced)</b></summary>
+
+If you prefer more control over the installation process:
+
+### 1. Clone and Prepare Environment
+```bash
+git clone https://github.com/l00p3rl00p/sheshaMajorMcp-rlm.git
+cd sheshaMajorMcp-rlm
+
+# Create and activate a virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 2. Install Dependencies
+```bash
+pip install -e ".[dev]"
+```
+
+### 3. Run the Librarian Installer
+```bash
+python -m shesha.librarian install
+```
+
+</details>
+
+
+---
+
 # Shesha
 
 <p align="center">
@@ -18,8 +100,8 @@ So far it seems to work, but it's only been tested with .txt documents and the O
 
 ## Prerequisites
 
-- Python 3.12+
-- Docker (for sandbox execution)
+- Python 3.11+
+- Docker (required for code execution; optional for indexing/management)
 - An LLM API key (or local Ollama installation)
 
 ## Supported LLM Providers
@@ -64,8 +146,8 @@ pip install shesha
 
 
 ```bash
-git clone https://github.com/Ovid/shesha.git
-cd shesha
+git clone https://github.com/l00p3rl00p/sheshaMajorMcp-rlm.git
+cd sheshaMajorMcp-rlm
 
 # Create and activate a virtual environment
 python3 -m venv .venv
@@ -74,6 +156,35 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 # Install with dev dependencies
 pip install -e ".[dev]"
 ```
+
+## Librarian (CLI + MCP Server)
+
+This repo includes **Librarian**, a vendor-neutral wrapper that provides:
+
+- a **headless CLI** (`librarian ...` or `python -m shesha.librarian ...`)
+- an **MCP stdio server** (`librarian mcp` or `python -m shesha.librarian mcp`)
+
+### One-command install + self-test (from source)
+
+From the repo root (with your venv active):
+
+```bash
+python -m pip install . && python -m shesha.librarian install
+```
+
+This will:
+
+- create persistent state dirs (storage + logs) with safe defaults
+- build/verify the sandbox Docker image and run a minimal self-test (MCP health + Docker/sandbox validation).
+- **Interactive Docker Setup**: If Docker is missing, Librarian will provide a guided prompt with installation instructions and options to proceed without it.
+- write a local manifest at `.librarian/manifest.json` recording the system status.
+- generate `mcp-server-readme.md` with the exact next commands
+
+Override state locations with:
+
+- `LIBRARIAN_HOME`
+- `LIBRARIAN_STORAGE_PATH`
+- `LIBRARIAN_LOG_DIR`
 
 ### Build the Sandbox Container
 
@@ -338,9 +449,9 @@ ruff format src tests
 make all
 ```
 
-## Development Setup
+## Architecture & Development
 
-See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for local tooling and GitHub Copilot setup.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the technical manual, development workflow, and security model.
 
 ## Project Structure
 

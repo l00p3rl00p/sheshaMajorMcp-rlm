@@ -37,9 +37,6 @@ class Shesha:
         config: SheshaConfig | None = None,
     ) -> None:
         """Initialize Shesha."""
-        # Verify Docker is available before proceeding
-        self._check_docker_available()
-
         # Use provided config or create from args
         if config is None:
             config = SheshaConfig()
@@ -54,17 +51,23 @@ class Shesha:
 
         self._config = config
 
+        # Verify Docker availability
+        self._docker_available = self._is_docker_available()
+
         # Initialize components
         self._storage = FilesystemStorage(
             config.storage_path,
             keep_raw_files=config.keep_raw_files,
         )
         self._parser_registry = create_default_registry()
-        self._pool = ContainerPool(
-            size=config.pool_size,
-            image=config.sandbox_image,
-            memory_limit=f"{config.container_memory_mb}m",
-        )
+        
+        self._pool: ContainerPool | None = None
+        if self._docker_available:
+            self._pool = ContainerPool(
+                size=config.pool_size,
+                image=config.sandbox_image,
+                memory_limit=f"{config.container_memory_mb}m",
+            )
 
         # Create RLM engine
         self._rlm_engine = RLMEngine(
@@ -73,6 +76,7 @@ class Shesha:
             max_iterations=config.max_iterations,
             max_output_chars=config.max_output_chars,
             execution_timeout=config.execution_timeout_sec,
+            docker_available=self._docker_available,
         )
 
         # Initialize repo ingester
@@ -92,11 +96,32 @@ class Shesha:
         atexit.register(_cleanup)
 
     @staticmethod
-    def _check_docker_available() -> None:
-        """Verify Docker daemon is running. Raises RuntimeError if not."""
+    def _is_docker_available() -> bool:
+        """Verify Docker daemon is running.
+        
+        Uses try/finally to ensure proper HTTP client cleanup.
+        """
+        client = None
         try:
             client = docker.from_env()
-            client.close()
+            client.ping()  # Verify actual connectivity
+            return True
+        except DockerException:
+            return False
+        finally:
+            if client:
+                client.close()
+
+    @staticmethod
+    def _check_docker_available() -> None:
+        """Verify Docker daemon is running. Raises RuntimeError if not.
+        
+        Uses try/finally to ensure proper HTTP client cleanup.
+        """
+        client = None
+        try:
+            client = docker.from_env()
+            client.ping()  # Verify actual connectivity
         except DockerException as e:
             error_str = str(e)
             if "Connection refused" in error_str:
@@ -108,9 +133,12 @@ class Shesha:
                     "No Docker-compatible socket found. "
                     "If you're using Podman, set DOCKER_HOST to Podman's socket:\n"
                     '  export DOCKER_HOST="unix://$(podman machine inspect '
-                    "--format '{{.ConnectionInfo.PodmanSocket.Path}}')\""
+                    '"--format \'{{.ConnectionInfo.PodmanSocket.Path}}\')"'
                 ) from e
             raise
+        finally:
+            if client:
+                client.close()
 
     def create_project(self, project_id: str) -> Project:
         """Create a new project."""
@@ -308,14 +336,16 @@ class Shesha:
     def start(self) -> None:
         """Start the container pool."""
         self._stopped = False
-        self._pool.start()
+        if self._pool:
+            self._pool.start()
 
     def stop(self) -> None:
         """Stop the container pool."""
         if self._stopped:
             return
         self._stopped = True
-        self._pool.stop()
+        if self._pool:
+            self._pool.stop()
 
     def __enter__(self) -> "Shesha":
         """Context manager entry."""

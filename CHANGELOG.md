@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-02-05
+
 ### Added
 
 - Experimental multi-repo PRD analysis (`shesha.experimental.multi_repo`)
@@ -20,6 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for alternate prompt directories via `SHESHA_PROMPTS_DIR` environment variable
 - `prompts/README.md` documenting prompt customization
 - Session write command (`write` or `write <filename>`) in example scripts (`repo.py`, `barsoom.py`) to save conversation transcripts as markdown files
+- Librarian installer + CLI + MCP stdio server (`python -m shesha.librarian ...` / `librarian ...`)
+- Local operator manifest output at `.librarian/manifest.json` with last self-test status and resolved state paths
+- Default local-first state paths with overrides via `LIBRARIAN_HOME`, `LIBRARIAN_STORAGE_PATH`, and `LIBRARIAN_LOG_DIR`
+- Librarian installer auto-builds the `shesha-sandbox` Docker image when missing (for query execution)
+- System audit on install with pre-flight checks for Python 3.11+ and virtual environment detection with actionable guidance
+- Interactive Docker installation with guided setup and platform-specific instructions when Docker is missing
+- Graceful Docker degradation: Shesha initializes successfully without Docker; queries disabled until Docker is available
+- Docker status tracking in manifest (`infra.docker_available` field)
+
+### Fixed
+
+- Docker HTTP client resource leak causing "ValueError: I/O operation on closed file" during garbage collection
 
 ## [0.3.0] 2026-02-04
 
