@@ -156,7 +156,14 @@ export const ScanlineEffect = () => (
  * Basic Error Boundary to prevent the entire app from crashing if a screen fails
  */
 export class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
-  public state = { hasError: false };
+  public state: { hasError: boolean };
+  public props: { children: React.ReactNode };
+
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.props = props;
+    this.state = { hasError: false };
+  }
 
   static getDerivedStateFromError() {
     return { hasError: true };

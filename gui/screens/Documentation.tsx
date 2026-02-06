@@ -8,7 +8,11 @@ import React, { useMemo, useState } from 'react';
 import { BookOpen, UploadCloud, RefreshCw, FileText, Terminal } from 'lucide-react';
 import { AppHeader, BottomNav } from '../components/Shared';
 import { ScreenName } from '../types';
+
+// Declare raw module types
+// @ts-ignore
 import readmeText from '../../mcp-server-readme.md?raw';
+// @ts-ignore
 import mcpSource from '../../src/shesha/librarian/mcp.py?raw';
 
 interface Props {
