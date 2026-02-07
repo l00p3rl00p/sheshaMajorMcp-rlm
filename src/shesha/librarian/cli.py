@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import subprocess
 import sys
@@ -18,6 +19,7 @@ from docker.errors import DockerException, ImageNotFound
 from shesha import __version__
 from shesha.exceptions import SheshaError
 from shesha.librarian.core import LibrarianCore, ValidationError, get_or_create_bridge_secret
+from shesha.librarian.config import set_manifest_dir
 from shesha.librarian.manifest import LibrarianManifest, SelfTestStatus
 from shesha.librarian.mcp_jsonrpc import encode_message, parse_messages
 from shesha.librarian.paths import LibrarianPaths, resolve_paths
@@ -466,50 +468,19 @@ def run_install(
     print(f"  {mcp_details}")
 
     # 2) Docker/sandbox validation (required for queries).
-    docker_available = False
-    if not skip_docker:
-        print("Self-test: Docker daemon…")
-        from shesha.shesha import Shesha as SheshaClass
+    print("Self-test: Docker daemon…")
+    from shesha.shesha import Shesha as SheshaClass
 
-        if SheshaClass._is_docker_available():
-            docker_available = True
-            print("  docker: ok")
-        else:
-            choice = _prompt_docker_options()
-            if choice == "guide":
-                _show_docker_install_guide()
-                # Re-check after guide
-                if SheshaClass._is_docker_available():
-                    docker_available = True
-                    print("  docker: ok (after install)")
-                else:
-                    print("  docker: still not detected. Proceeding with Docker disabled.")
-            elif choice == "abort":
-                return InstallResult(
-                    ok=False, details="Installation aborted by user (Docker missing)"
-                )
-            elif choice == "skip":
-                print("  docker: skipped by user")
-            else:
-                # Non-interactive or fallback
-                msg = "Docker is not running. Please start Docker and try again."
-                status = SelfTestStatus(
-                    ok=False,
-                    timestamp=_utc_now_iso(),
-                    details=f"Docker check failed: {msg}",
-                    docker_available=False,
-                )
-                _write_install_artifacts(
-                    manifest_path=manifest_path,
-                    readme_path=readme_path,
-                    storage_path=paths.storage,
-                    logs_path=paths.logs,
-                    self_test=status,
-                    docker_available=False,
-                )
-                return InstallResult(ok=False, details=status.details)
+    if skip_docker:
+        docker_available = False
+        print("  docker: skipped (--skip-docker)")
+    elif SheshaClass._is_docker_available():
+        docker_available = True
+        print("  docker: ok")
     else:
-        print("Self-test: Docker daemon… skipped")
+        docker_available = False
+        msg = "Docker is not running. Start Docker Desktop (or equivalent) before installing."
+        print(f"  {msg}")
 
     if docker_available and not skip_sandbox:
         print("Self-test: sandbox image + ping…")
@@ -582,11 +553,49 @@ def _print_install_summary(*, paths: LibrarianPaths, manifest_dir: Path) -> None
     print("Next steps:")
     print("  MCP (stdio):")
     print("    python -m shesha.librarian mcp")
+    print("    docker must be running before starting MCP query workflows.")
     print("  Headless query:")
     print('    python -m shesha.librarian query --project <project_id> "<question>"\n')
+    print("GUI + Bridge:")
+    print("    python -m shesha.librarian bridge  # starts API on http://127.0.0.1:8000")
+    print("    python -m shesha.librarian gui     # opens GUI on http://localhost:$LIBRARIAN_GUI_PORT")
+    print("    npm run dev (inside gui/)  # optional operator UI (Vite chooses the port)")
     print("Local outputs:")
     print(f"  manifest: {manifest_path}")
     print(f"  readme:   {readme_path}")
+
+
+def _offer_path_setup() -> None:
+    if not sys.stdin.isatty():
+        return
+
+    print("\nOptional: add Librarian venv to PATH so `librarian` is available everywhere.")
+    print("  1) Add to PATH now")
+    print("  2) Skip")
+    choice = input("Choose [1-2]: ").strip()
+    if choice != "1":
+        return
+
+    venv_bin = Path(".venv") / "bin"
+    if sys.platform.startswith("win"):
+        venv_bin = Path(".venv") / "Scripts"
+
+    export_line = f'export PATH="{venv_bin.resolve()}:$PATH"'
+    shell = os.environ.get("SHELL", "")
+    rc_file = None
+    if shell.endswith("zsh"):
+        rc_file = Path.home() / ".zshrc"
+    elif shell.endswith("bash"):
+        rc_file = Path.home() / ".bashrc"
+
+    if rc_file is None:
+        print("Could not detect shell rc file. Add this manually:")
+        print(f"  {export_line}")
+        return
+
+    with rc_file.open("a", encoding="utf-8") as handle:
+        handle.write(f"\n{export_line}\n")
+    print(f"Added to PATH in {rc_file}")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -736,6 +745,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Launch the Shesha GUI in your browser",
     )
     gui.add_argument(
+        "--gui-port",
+        type=int,
+        default=None,
+        help="GUI port (overrides LIBRARIAN_GUI_PORT). Required unless LIBRARIAN_GUI_PORT is set.",
+    )
+    gui.add_argument(
         "--port",
         type=int,
         default=8000,
@@ -756,11 +771,46 @@ def command_bridge(args: argparse.Namespace) -> None:
 def command_gui(args: argparse.Namespace) -> None:
     """Launch the GUI with a seamless secret token."""
     import webbrowser
+    import urllib.request
+    import urllib.error
 
     key = get_or_create_bridge_secret()
-    # TODO: In production, this would be the actual hosted or local build URL.
-    # For now, we point to the Vite dev server default.
-    url = f"http://localhost:5173/?key={key}"
+    gui_port_raw = (
+        args.gui_port
+        if getattr(args, "gui_port", None) is not None
+        else os.environ.get("LIBRARIAN_GUI_PORT")
+    )
+
+    def _looks_like_gui(port: int) -> bool:
+        try:
+            req = urllib.request.Request(
+                f"http://127.0.0.1:{port}/",
+                headers={"User-Agent": "librarian/cli"},
+                method="GET",
+            )
+            with urllib.request.urlopen(req, timeout=0.35) as resp:
+                body = resp.read(4096).decode("utf-8", errors="replace")
+            return "<title>Shesha RLM Operator</title>" in body
+        except (urllib.error.URLError, TimeoutError, ValueError):
+            return False
+
+    if gui_port_raw:
+        gui_port = int(gui_port_raw)
+    else:
+        # Auto-detect a running GUI dev server to avoid forcing a port setting.
+        candidates = [5173, 5174, 5175, 3000, 4173]
+        gui_port = next((p for p in candidates if _looks_like_gui(p)), None)
+        if gui_port is None:
+            print("GUI dev server not detected.", file=sys.stderr)
+            print("Start it, then re-run this command:", file=sys.stderr)
+            print("  cd gui && npm run dev", file=sys.stderr)
+            print("If your port is not auto-detected, set it explicitly:", file=sys.stderr)
+            print("  LIBRARIAN_GUI_PORT=<port> librarian gui", file=sys.stderr)
+            print("or:", file=sys.stderr)
+            print("  librarian gui --gui-port <port>", file=sys.stderr)
+            raise SystemExit(2)
+
+    url = f"http://localhost:{gui_port}/?key={key}"
 
     print(f"🚀 Launching GUI: {url}")
     print("If browser doesn't open, copy and paste the URL above.")
@@ -799,11 +849,21 @@ def main(argv: list[str] | None = None) -> int:
         if not result.ok:
             print(result.details, file=sys.stderr)
             return 1
+
+        # Record where the operator chose to write the manifest/readme so the GUI bridge
+        # can find it even when started from a different working directory.
+        try:
+            set_manifest_dir(paths, manifest_dir.resolve())
+        except PermissionError:
+            # In restricted environments this may be blocked. The install can still succeed;
+            # the operator can set the manifest dir later via the GUI bridge settings.
+            pass
         
         # Ensure bridge secret is generated on install
         get_or_create_bridge_secret(paths)
         
         _print_install_summary(paths=paths, manifest_dir=manifest_dir)
+        _offer_path_setup()
         return 0
 
     if cmd == "mcp":

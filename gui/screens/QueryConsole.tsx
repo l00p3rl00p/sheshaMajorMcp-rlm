@@ -12,12 +12,14 @@ import {
   Check
 } from 'lucide-react';
 import { ScreenName } from '../types';
+import { HeaderTabs } from '../components/Shared';
 
 interface Props {
   onNavigate: (screen: ScreenName) => void;
+  currentScreen: ScreenName;
 }
 
-export const QueryConsoleScreen: React.FC<Props> = ({ onNavigate }) => {
+export const QueryConsoleScreen: React.FC<Props> = ({ onNavigate, currentScreen }) => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [clips, setClips] = useState<any[]>([
@@ -53,18 +55,21 @@ export const QueryConsoleScreen: React.FC<Props> = ({ onNavigate }) => {
   return (
     <div className="flex flex-col h-screen bg-background-dark text-white font-display overflow-hidden relative">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 bg-background-dark border-b border-border-dark z-20">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-500/10 rounded-lg text-blue-400">
-            <Database size={20} />
+      <header className="flex flex-col gap-2 px-4 py-3 bg-background-dark border-b border-border-dark z-20">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-500/10 rounded-lg text-blue-400">
+              <Database size={20} />
+            </div>
+            <h1 className="text-lg font-bold tracking-tight">Shesha RLM</h1>
           </div>
-          <h1 className="text-lg font-bold tracking-tight">Shesha RLM</h1>
+          <div className="flex items-center gap-2">
+             <button onClick={() => onNavigate('agent-center')} className="text-gray-400 hover:text-white transition-colors" title="Back to Agent Center">
+                <History size={20} />
+             </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-           <button onClick={() => onNavigate('agent-center')} className="text-gray-400 hover:text-white transition-colors" title="Back to Agent Center">
-              <History size={20} />
-           </button>
-        </div>
+        <HeaderTabs currentScreen={currentScreen} onNavigate={onNavigate} />
       </header>
 
       <main className="flex-1 flex flex-col relative z-10 overflow-hidden">
@@ -201,16 +206,14 @@ export const QueryConsoleScreen: React.FC<Props> = ({ onNavigate }) => {
          </div>
       </div>
 
-      {/* Drawer Toggle Handle (Visible when closed) */}
-      {!isDrawerOpen && (
-         <button 
-           onClick={() => setIsDrawerOpen(true)}
-           className="absolute right-0 top-1/2 -translate-y-1/2 bg-surface-dark border-l border-y border-white/10 p-1.5 rounded-l-lg text-gray-400 hover:text-white shadow-lg z-40"
-           title="Open scratchpad"
-         >
-            <ChevronLeft size={20} />
-         </button>
-      )}
+      {/* Drawer Toggle Handle */}
+      <button 
+        onClick={() => setIsDrawerOpen((v) => !v)}
+        className={`absolute top-1/2 -translate-y-1/2 bg-surface-dark border border-white/10 p-1.5 rounded-l-lg text-gray-400 hover:text-white shadow-lg z-40 ${isDrawerOpen ? 'right-[280px]' : 'right-0'}`}
+        title={isDrawerOpen ? 'Close scratchpad' : 'Open scratchpad'}
+      >
+         {isDrawerOpen ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+      </button>
     </div>
   );
 };

@@ -10,9 +10,10 @@ import { ScreenName } from '../types';
 
 interface Props {
   onNavigate: (screen: ScreenName) => void;
+  currentScreen: ScreenName;
 }
 
-export const CliReferenceScreen: React.FC<Props> = ({ onNavigate }) => {
+export const CliReferenceScreen: React.FC<Props> = ({ onNavigate, currentScreen }) => {
   const commands = [
     {
       name: 'librarian install',
@@ -84,9 +85,11 @@ export const CliReferenceScreen: React.FC<Props> = ({ onNavigate }) => {
   return (
     <div className="flex flex-col min-h-screen bg-background-dark text-white font-display">
       <AppHeader 
-        title="CLI Reference" 
-        showBack 
+        title="CLI Reference"
+        showBack
         onBack={() => onNavigate('dashboard')}
+        currentScreen={currentScreen}
+        onNavigate={onNavigate}
       />
 
       {/* Search Bar */}
@@ -183,7 +186,7 @@ export const CliReferenceScreen: React.FC<Props> = ({ onNavigate }) => {
         <Download size={24} />
       </button>
 
-      <BottomNav currentScreen="cli" onNavigate={onNavigate} />
+      <BottomNav currentScreen={currentScreen} onNavigate={onNavigate} />
     </div>
   );
 };

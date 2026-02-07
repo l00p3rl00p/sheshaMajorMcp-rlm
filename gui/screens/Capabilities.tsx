@@ -18,9 +18,10 @@ import { ScreenName } from '../types';
 
 interface Props {
   onNavigate: (screen: ScreenName) => void;
+  currentScreen: ScreenName;
 }
 
-export const CapabilitiesScreen: React.FC<Props> = ({ onNavigate }) => {
+export const CapabilitiesScreen: React.FC<Props> = ({ onNavigate, currentScreen }) => {
   return (
     <div className="flex flex-col min-h-screen bg-background-dark text-white font-display">
       <AppHeader 
@@ -30,6 +31,8 @@ export const CapabilitiesScreen: React.FC<Props> = ({ onNavigate }) => {
             <Settings size={20} />
           </button>
         }
+        currentScreen={currentScreen}
+        onNavigate={onNavigate}
       />
 
       <main className="flex-1 overflow-y-auto no-scrollbar pb-24 px-4 space-y-6 pt-2">
@@ -219,7 +222,7 @@ export const CapabilitiesScreen: React.FC<Props> = ({ onNavigate }) => {
         </section>
       </main>
 
-      <BottomNav currentScreen="capabilities" onNavigate={onNavigate} />
+      <BottomNav currentScreen={currentScreen} onNavigate={onNavigate} />
     </div>
   );
 };

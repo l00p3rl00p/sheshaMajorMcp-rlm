@@ -30,7 +30,14 @@ pip install -e ".[dev]"
 python -m shesha.librarian install
 ```
 
-That's it! The installer will guide you through everything automatically.
+That’s it! The installer will fail fast with clear errors if Docker, Python 3.11+, or other required binaries are missing, ensuring the system is runnable before it finishes.
+
+> **Installed users:** after `python -m shesha.librarian install`, keep Docker running and use:
+>
+> ```bash
+> librarian bridge
+> librarian gui
+> ```
 
 **Next Step**: Read [**docs/GETTING_STARTED.md**](./docs/GETTING_STARTED.md) to perform your first codebase research.
 
@@ -88,9 +95,37 @@ So far it seems to work, but it's only been tested with .txt documents and the O
 
 ---
 
+## Startup Workflow
+
+Before running the GUI, confirm the critical dependencies are running:
+
+1. `Docker` must be started (Docker Desktop, Colima, or Podman). Install/launch before proceeding.
+2. Run the bridge API, which proxies CLI commands:
+
+```bash
+python -m shesha.librarian bridge
+```
+
+   - The bridge listens on `http://127.0.0.1:8000` and exposes `/api/*` for the GUI.
+3. Open the GUI (uses the same bridge key for authentication):
+
+```bash
+python -m shesha.librarian gui
+```
+
+   - This launches the browser pointing at `http://localhost:${LIBRARIAN_GUI_PORT:-3000}`.
+   - If you prefer the Vite dev server, you can run it separately inside `gui/`:
+     ```bash
+     cd gui
+     npm install
+     npm run dev
+     ```
+
+   - The GUI health audit panel shows Docker, bridge, and manifest status and lets you recheck dependencies without leaving the UI.
+
 ## Optional GUI (Operator Dashboard)
 
-The optional GUI lives in the `gui` folder (the repo root does not contain a Node `package.json`).
+The GUI is the operator dashboard and sits in the `gui/` folder:
 
 ```bash
 cd gui

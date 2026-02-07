@@ -16,9 +16,10 @@ import { BridgeClient } from '../src/api/client';
 
 interface Props {
   onNavigate: (screen: ScreenName) => void;
+  currentScreen: ScreenName;
 }
 
-export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
+export const DashboardScreen: React.FC<Props> = ({ onNavigate, currentScreen }) => {
   const [health, setHealth] = React.useState({ status: 'connecting', docker_available: false, version: '...' });
 
   React.useEffect(() => {
@@ -36,6 +37,8 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
       <AppHeader
         subtitle={`Librarian MCP • v${health.version}`}
         icon={<Server size={20} className="text-primary" />}
+        currentScreen={currentScreen}
+        onNavigate={onNavigate}
       />
 
       <main className="flex-1 overflow-y-auto no-scrollbar pb-24 px-5 pt-6 space-y-6">
@@ -159,7 +162,7 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
         </button>
       </div>
 
-      <BottomNav currentScreen="dashboard" onNavigate={onNavigate} />
+      <BottomNav currentScreen={currentScreen} onNavigate={onNavigate} />
     </div>
   );
 };

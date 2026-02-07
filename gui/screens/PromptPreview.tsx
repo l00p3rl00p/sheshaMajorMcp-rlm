@@ -9,12 +9,14 @@ import {
   Check
 } from 'lucide-react';
 import { ScreenName } from '../types';
+import { HeaderTabs } from '../components/Shared';
 
 interface Props {
   onNavigate: (screen: ScreenName) => void;
+  currentScreen: ScreenName;
 }
 
-export const PromptPreviewScreen: React.FC<Props> = ({ onNavigate }) => {
+export const PromptPreviewScreen: React.FC<Props> = ({ onNavigate, currentScreen }) => {
   const [copied, setCopied] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
 
@@ -35,21 +37,24 @@ export const PromptPreviewScreen: React.FC<Props> = ({ onNavigate }) => {
     <div className="flex flex-col h-screen bg-[#0d0d12] text-white font-display overflow-hidden relative">
       
       {/* Header */}
-      <header className="flex-none h-16 px-4 flex items-center justify-between bg-[#121218] border-b border-white/5 z-20">
-         <div className="flex flex-col">
-            <h1 className="text-base font-bold tracking-tight uppercase">Final Preview</h1>
-            <div className="flex items-center gap-1.5">
-               <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
-               <span className="text-[10px] font-bold text-primary tracking-wider">ESTIMATOR READY</span>
+      <header className="flex-none px-4 pt-3 pb-2 flex flex-col gap-2 bg-[#121218] border-b border-white/5 z-20">
+         <div className="flex items-center justify-between">
+            <div className="flex flex-col">
+               <h1 className="text-base font-bold tracking-tight uppercase">Final Preview</h1>
+               <div className="flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
+                  <span className="text-[10px] font-bold text-primary tracking-wider">ESTIMATOR READY</span>
+               </div>
             </div>
+            <button 
+               onClick={() => onNavigate('staging-area')}
+               className="p-1 rounded-full hover:bg-white/10 text-gray-400"
+               title="Close preview"
+            >
+               <X size={24} />
+            </button>
          </div>
-         <button 
-            onClick={() => onNavigate('staging-area')}
-            className="p-1 rounded-full hover:bg-white/10 text-gray-400"
-            title="Close preview"
-         >
-            <X size={24} />
-         </button>
+         <HeaderTabs currentScreen={currentScreen} onNavigate={onNavigate} />
       </header>
 
       <main className="flex-1 overflow-y-auto px-4 py-6 space-y-6 custom-scrollbar">

@@ -17,6 +17,7 @@ import mcpSource from '../../src/shesha/librarian/mcp.py?raw';
 
 interface Props {
   onNavigate: (screen: ScreenName) => void;
+  currentScreen: ScreenName;
 }
 
 const extractCommands = (text: string): string[] => {
@@ -33,7 +34,7 @@ const extractMcpTools = (text: string): string[] => {
   return Array.from(new Set(tools));
 };
 
-export const DocumentationScreen: React.FC<Props> = ({ onNavigate }) => {
+export const DocumentationScreen: React.FC<Props> = ({ onNavigate, currentScreen }) => {
   const [overrideText, setOverrideText] = useState<string | null>(null);
   const sourceText = overrideText ?? readmeText;
   const commands = useMemo(() => extractCommands(sourceText), [sourceText]);
@@ -80,6 +81,8 @@ export const DocumentationScreen: React.FC<Props> = ({ onNavigate }) => {
             </button>
           </div>
         }
+        currentScreen={currentScreen}
+        onNavigate={onNavigate}
       />
 
       <main className="flex-1 overflow-y-auto no-scrollbar pb-24 px-5 pt-6 space-y-6">
@@ -130,7 +133,7 @@ export const DocumentationScreen: React.FC<Props> = ({ onNavigate }) => {
         </section>
       </main>
 
-      <BottomNav currentScreen="documentation" onNavigate={onNavigate} />
+      <BottomNav currentScreen={currentScreen} onNavigate={onNavigate} />
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { DashboardScreen } from './screens/Dashboard';
 import { CliReferenceScreen } from './screens/CLI';
 import { CapabilitiesScreen } from './screens/Capabilities';
@@ -14,154 +14,201 @@ import { PromptPreviewScreen } from './screens/PromptPreview';
 import { MountManagerScreen } from './screens/MountManager';
 import { DocumentationScreen } from './screens/Documentation';
 import { ScreenName } from './types';
-import { HelpCircle, Menu } from 'lucide-react';
+import { SettingsScreen } from './screens/Settings';
+import { HelpCircle, Activity } from 'lucide-react';
 import { ErrorBoundary } from './components/Shared';
+import { HealthPanel, HealthState } from './components/HealthPanel';
+import { BridgeClient } from './src/api/client';
+import { HelpOverlay } from './components/HelpOverlay';
 
 const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<ScreenName>('dashboard');
-  const [isNavOpen, setIsNavOpen] = useState(false);
-  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [health, setHealth] = useState<HealthState>({
+    bridgeStatus: 'unknown',
+    dockerAvailable: false,
+    manifestExists: false,
+    manifestExpectedPath: '',
+    manifestDir: '',
+    manifestConfigured: false,
+    lastChecked: null,
+    checking: true,
+  });
+  const [showHealthPanel, setShowHealthPanel] = useState(true);
+  const [showManifestPrompt, setShowManifestPrompt] = useState(false);
+  const [isHelpOverlayOpen, setIsHelpOverlayOpen] = useState(false);
 
-  const helpText = useMemo<Record<ScreenName, string>>(
-    () => ({
-      dashboard: 'High-level system status. Use this to validate MCP readiness and Docker availability.',
-      cli: 'Reference the actual CLI commands and flags for Librarian operations.',
-      capabilities: 'See available MCP tools and environment constraints.',
-      persistence: 'Inspect manifest, storage, and logs. Read-only visibility layer.',
-      'agent-center': 'Operator command center with reframe modes and quick access to tracing.',
-      'agent-config': 'Configure personas and tool access at a glance.',
-      'live-interaction': 'Trace live MCP thought/tool flow. Read-only view.',
-      'query-console': 'Compose and preview project queries before running via CLI.',
-      'message-monitor': 'Visualize MCP request/response pairs and errors.',
-      'operator-chat': 'Operator chat view with tool cards and clip gallery.',
-      'staging-area': 'Build multi-step prompts from clips and fragments.',
-      'prompt-preview': 'Token-aware prompt preview before execution.',
-      'mount-manager': 'Manage local directory mounts/sources for observation.',
-      'styling-preview': 'Preview design system components.',
-      documentation: 'Generated command list from mcp-server-readme.md (load a newer file to refresh).',
-    }),
-    []
-  );
+  const refreshHealth = useCallback(async () => {
+    setHealth((prev) => ({ ...prev, checking: true }));
+    try {
+      const healthResp = await BridgeClient.checkHealth();
+      const manifest = await BridgeClient.getManifest();
+      setHealth({
+        bridgeStatus: healthResp.status === 'active' ? 'active' : 'disconnected',
+        dockerAvailable: healthResp.docker_available,
+        manifestExists: manifest.exists,
+        manifestExpectedPath: manifest.expected_path,
+        manifestDir: manifest.manifest_dir,
+        manifestConfigured: manifest.configured,
+        lastChecked: new Date().toLocaleTimeString(),
+        checking: false,
+      });
 
-  const navItems: { id: ScreenName; label: string }[] = [
-    { id: 'dashboard', label: 'Dashboard' },
-    { id: 'cli', label: 'CLI Reference' },
-    { id: 'capabilities', label: 'Capabilities' },
-    { id: 'persistence', label: 'Persistence' },
-    { id: 'documentation', label: 'Documentation' },
-    { id: 'agent-center', label: 'Agent Center' },
-    { id: 'agent-config', label: 'Agent Config' },
-    { id: 'live-interaction', label: 'Live Interaction' },
-    { id: 'query-console', label: 'Query Console' },
-    { id: 'message-monitor', label: 'Message Monitor' },
-    { id: 'operator-chat', label: 'Operator Chat' },
-    { id: 'staging-area', label: 'Staging Area' },
-    { id: 'prompt-preview', label: 'Prompt Preview' },
-    { id: 'mount-manager', label: 'Mount Manager' },
-  ];
+      const dismissed = localStorage.getItem('shesha_manifest_prompt_dismissed') === '1';
+      if (!dismissed && healthResp.status === 'active' && !manifest.exists && !manifest.configured) {
+        setShowManifestPrompt(true);
+        setIsHelpOverlayOpen(false);
+        setShowHealthPanel(false);
+      }
+    } catch (error) {
+      setHealth((prev) => ({
+        ...prev,
+        checking: false,
+        bridgeStatus: 'disconnected',
+      }));
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshHealth();
+    const interval = setInterval(refreshHealth, 15000);
+    return () => clearInterval(interval);
+  }, [refreshHealth]);
+  const toggleHelpOverlay = () => {
+    setIsHelpOverlayOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        setShowHealthPanel(false);
+        setShowManifestPrompt(false);
+      }
+      return next;
+    });
+  };
+
+  const toggleHealthPanel = () => {
+    setShowHealthPanel((prev) => {
+      const next = !prev;
+      if (next) {
+        setIsHelpOverlayOpen(false);
+        setShowManifestPrompt(false);
+      }
+      return next;
+    });
+  };
 
   const renderScreen = () => {
     switch (currentScreen) {
       case 'dashboard':
-        return <DashboardScreen onNavigate={setCurrentScreen} />;
+        return <DashboardScreen onNavigate={setCurrentScreen} currentScreen={currentScreen} />;
       case 'cli':
-        return <CliReferenceScreen onNavigate={setCurrentScreen} />;
+        return <CliReferenceScreen onNavigate={setCurrentScreen} currentScreen={currentScreen} />;
       case 'capabilities':
-        return <CapabilitiesScreen onNavigate={setCurrentScreen} />;
+        return <CapabilitiesScreen onNavigate={setCurrentScreen} currentScreen={currentScreen} />;
       case 'persistence':
-        return <PersistenceScreen onNavigate={setCurrentScreen} />;
+        return <PersistenceScreen onNavigate={setCurrentScreen} currentScreen={currentScreen} />;
       case 'documentation':
-        return <DocumentationScreen onNavigate={setCurrentScreen} />;
+        return <DocumentationScreen onNavigate={setCurrentScreen} currentScreen={currentScreen} />;
       case 'agent-center':
-        return <AgentCenterScreen onNavigate={setCurrentScreen} />;
+        return <AgentCenterScreen onNavigate={setCurrentScreen} currentScreen={currentScreen} />;
       case 'agent-config':
-        return <AgentConfigScreen onNavigate={setCurrentScreen} />;
+        return <AgentConfigScreen onNavigate={setCurrentScreen} currentScreen={currentScreen} />;
       case 'live-interaction':
-        return <LiveInteractionScreen onNavigate={setCurrentScreen} />;
+        return <LiveInteractionScreen onNavigate={setCurrentScreen} currentScreen={currentScreen} />;
       case 'query-console':
-        return <QueryConsoleScreen onNavigate={setCurrentScreen} />;
+        return <QueryConsoleScreen onNavigate={setCurrentScreen} currentScreen={currentScreen} />;
       case 'message-monitor':
-        return <MessageMonitorScreen onNavigate={setCurrentScreen} />;
+        return <MessageMonitorScreen onNavigate={setCurrentScreen} currentScreen={currentScreen} />;
       case 'operator-chat':
-        return <OperatorChatScreen onNavigate={setCurrentScreen} />;
+        return <OperatorChatScreen onNavigate={setCurrentScreen} currentScreen={currentScreen} />;
       case 'staging-area':
-        return <StagingAreaScreen onNavigate={setCurrentScreen} />;
+        return <StagingAreaScreen onNavigate={setCurrentScreen} currentScreen={currentScreen} />;
       case 'prompt-preview':
-        return <PromptPreviewScreen onNavigate={setCurrentScreen} />;
+        return <PromptPreviewScreen onNavigate={setCurrentScreen} currentScreen={currentScreen} />;
       case 'mount-manager':
-        return <MountManagerScreen onNavigate={setCurrentScreen} />;
+        return <MountManagerScreen onNavigate={setCurrentScreen} currentScreen={currentScreen} />;
+      case 'settings':
+        return <SettingsScreen onNavigate={setCurrentScreen} currentScreen={currentScreen} />;
       default:
-        return <DashboardScreen onNavigate={setCurrentScreen} />;
+        return <DashboardScreen onNavigate={setCurrentScreen} currentScreen={currentScreen} />;
     }
   };
 
   return (
     <div className="w-full h-screen overflow-hidden bg-black flex flex-col shadow-2xl relative">
+      {showHealthPanel && (
+        <HealthPanel
+          health={health}
+          onRefresh={refreshHealth}
+          onOpenBridge={() => setCurrentScreen('mount-manager')}
+          onOpenSettings={() => setCurrentScreen('settings')}
+          onClose={() => setShowHealthPanel(false)}
+        />
+      )}
       <ErrorBoundary>
         {renderScreen()}
       </ErrorBoundary>
 
-      {/* Global Navigation Toggle */}
-      <button
-        onClick={() => setIsNavOpen(true)}
-        className="fixed top-4 left-4 z-[90] p-2 rounded-full bg-black/60 border border-white/10 text-gray-200 hover:text-primary hover:border-primary/30 transition-colors"
-        title="Open global navigation"
-      >
-        <Menu size={18} />
-      </button>
-
       {/* Global Help Toggle */}
       <button
-        onClick={() => setIsHelpOpen(true)}
+        onClick={toggleHelpOverlay}
         className="fixed top-4 right-4 z-[90] p-2 rounded-full bg-black/60 border border-white/10 text-gray-200 hover:text-primary hover:border-primary/30 transition-colors"
-        title="Open help for this screen"
+        title="Open detailed help for this screen"
       >
         <HelpCircle size={18} />
       </button>
-
-      {/* Navigation Drawer */}
-      {isNavOpen && (
-        <div className="fixed inset-0 z-[80]">
-          <div
-            className="absolute inset-0 bg-black/60"
-            onClick={() => setIsNavOpen(false)}
-            title="Close navigation"
-          />
-          <div className="absolute top-0 left-0 bottom-0 w-[280px] bg-[#0f1210] border-r border-white/10 shadow-2xl p-4 overflow-y-auto">
-            <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">Jump To</div>
-            <div className="space-y-2">
-              {navItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    setCurrentScreen(item.id);
-                    setIsNavOpen(false);
-                  }}
-                  className={`w-full text-left px-3 py-2 rounded-lg border transition-colors ${currentScreen === item.id
-                    ? 'border-primary/40 text-primary bg-primary/10'
-                    : 'border-white/10 text-gray-300 hover:border-primary/30 hover:text-white'
-                    }`}
-                  title={`Go to ${item.label}`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+      <button
+        onClick={toggleHealthPanel}
+        className="fixed top-4 right-16 z-[90] p-2 rounded-full bg-black/60 border border-white/10 text-gray-200 hover:text-primary hover:border-primary/30 transition-colors"
+        title={showHealthPanel ? 'Hide health panel' : 'Show health panel'}
+      >
+        <Activity size={18} />
+      </button>
+      {isHelpOverlayOpen && (
+        <HelpOverlay
+          screen={currentScreen}
+          onClose={() => setIsHelpOverlayOpen(false)}
+        />
       )}
 
-      {/* Help Panel */}
-      {isHelpOpen && (
-        <div className="fixed inset-0 z-[85]">
+      {/* First-run Manifest Prompt */}
+      {showManifestPrompt && (
+        <div className="fixed inset-0 z-[88]">
           <div
-            className="absolute inset-0 bg-black/60"
-            onClick={() => setIsHelpOpen(false)}
-            title="Close help"
+            className="absolute inset-0 bg-black/70"
+            onClick={() => { }}
+            title="Manifest setup required"
           />
-          <div className="absolute top-16 right-6 w-[320px] bg-[#0f1210] border border-white/10 shadow-2xl rounded-xl p-4">
-            <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">Help</div>
-            <div className="text-sm text-gray-200">{helpText[currentScreen]}</div>
+          <div className="absolute top-24 left-1/2 -translate-x-1/2 w-[92%] max-w-[520px] bg-[#0f1210] border border-white/10 shadow-2xl rounded-2xl p-5">
+            <div className="text-xs text-gray-500 uppercase tracking-wider">Setup Required</div>
+            <div className="mt-2 text-base font-bold text-white">Choose a manifest directory</div>
+            <div className="mt-2 text-sm text-gray-200">
+              The bridge could not find <span className="font-mono">.librarian/manifest.json</span>. Pick a folder to store it
+              (typically your repo root), then run <span className="font-mono">librarian install</span> once.
+            </div>
+            <div className="mt-3 text-xs text-gray-400">
+              Expected location after you set it: <span className="font-mono break-all">{health.manifestExpectedPath || '(unknown)'}</span>
+            </div>
+            <div className="mt-4 flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  localStorage.setItem('shesha_manifest_prompt_dismissed', '1');
+                  setShowManifestPrompt(false);
+                }}
+                className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-gray-200 text-xs hover:bg-white/10"
+                title="Dismiss this prompt (you can configure later in Settings)"
+              >
+                Dismiss
+              </button>
+              <button
+                onClick={() => {
+                  setCurrentScreen('settings');
+                  setShowManifestPrompt(false);
+                }}
+                className="px-3 py-2 rounded-lg bg-primary text-black text-xs font-bold hover:bg-primary/90"
+                title="Open Settings to set manifest-dir"
+              >
+                Open Settings
+              </button>
+            </div>
           </div>
         </div>
       )}

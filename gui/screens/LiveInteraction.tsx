@@ -14,12 +14,14 @@ import {
   Play
 } from 'lucide-react';
 import { ScreenName } from '../types';
+import { HeaderTabs } from '../components/Shared';
 
 interface Props {
   onNavigate: (screen: ScreenName) => void;
+  currentScreen: ScreenName;
 }
 
-export const LiveInteractionScreen: React.FC<Props> = ({ onNavigate }) => {
+export const LiveInteractionScreen: React.FC<Props> = ({ onNavigate, currentScreen }) => {
   const [isPaused, setIsPaused] = useState(false);
   const [logs, setLogs] = useState([1, 2, 3, 4]); // Dummy IDs
   const [expandedPayload, setExpandedPayload] = useState(false);
@@ -69,6 +71,10 @@ export const LiveInteractionScreen: React.FC<Props> = ({ onNavigate }) => {
            <button className="flex-1 py-2 rounded-lg bg-background-dark shadow-sm text-sm font-bold text-primary flex items-center justify-center gap-2 border border-[#356448]" title="Trace view (current)">
               <TerminalIcon size={16} /> Trace View
            </button>
+        </div>
+
+        <div className="mt-3">
+          <HeaderTabs currentScreen={currentScreen} onNavigate={onNavigate} />
         </div>
       </header>
 

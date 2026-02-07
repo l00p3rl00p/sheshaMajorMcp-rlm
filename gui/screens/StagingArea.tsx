@@ -11,9 +11,11 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { ScreenName } from '../types';
+import { HeaderTabs } from '../components/Shared';
 
 interface Props {
   onNavigate: (screen: ScreenName) => void;
+  currentScreen: ScreenName;
 }
 
 interface Fragment {
@@ -25,7 +27,7 @@ interface Fragment {
   borderColor: string;
 }
 
-export const StagingAreaScreen: React.FC<Props> = ({ onNavigate }) => {
+export const StagingAreaScreen: React.FC<Props> = ({ onNavigate, currentScreen }) => {
   const [fragments, setFragments] = useState<Fragment[]>([
     {
       id: 1,
@@ -79,23 +81,26 @@ export const StagingAreaScreen: React.FC<Props> = ({ onNavigate }) => {
     <div className="flex flex-col h-screen bg-[#0d0d12] text-white font-display overflow-hidden relative">
       
       {/* Header */}
-      <header className="flex-none h-16 px-4 flex items-center justify-between bg-[#121218] border-b border-white/5 z-20">
-         <div className="flex items-center gap-3">
-             <button 
-                onClick={() => onNavigate('operator-chat')}
-                className="p-1 rounded-full hover:bg-white/10 text-gray-400"
-                title="Back to Operator Chat"
-             >
-                <ArrowLeft size={24} />
-             </button>
-             <div>
-                <h1 className="text-base font-bold tracking-tight uppercase">Staging Matrix</h1>
-                <p className="text-[10px] text-purple-400 font-mono tracking-wide">{fragments.length} FRAGMENTS ACTIVE</p>
-             </div>
+      <header className="flex-none px-4 pt-3 pb-2 flex flex-col gap-2 bg-[#121218] border-b border-white/5 z-20">
+         <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+               <button 
+                  onClick={() => onNavigate('operator-chat')}
+                  className="p-1 rounded-full hover:bg-white/10 text-gray-400"
+                  title="Back to Operator Chat"
+               >
+                  <ArrowLeft size={24} />
+               </button>
+               <div>
+                  <h1 className="text-base font-bold tracking-tight uppercase">Staging Matrix</h1>
+                  <p className="text-[10px] text-purple-400 font-mono tracking-wide">{fragments.length} FRAGMENTS ACTIVE</p>
+               </div>
+            </div>
+            <button className="text-gray-500 hover:text-white transition-colors" title="More options">
+               <ChevronDown size={20} />
+            </button>
          </div>
-         <button className="text-gray-500 hover:text-white transition-colors" title="More options">
-            <ChevronDown size={20} />
-         </button>
+         <HeaderTabs currentScreen={currentScreen} onNavigate={onNavigate} />
       </header>
 
       {/* Main Content */}

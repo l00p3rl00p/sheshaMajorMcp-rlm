@@ -20,12 +20,14 @@ import {
    Save
 } from 'lucide-react';
 import { ScreenName } from '../types';
+import { HeaderTabs } from '../components/Shared';
 
 interface Props {
    onNavigate: (screen: ScreenName) => void;
+   currentScreen: ScreenName;
 }
 
-export const AgentConfigScreen: React.FC<Props> = ({ onNavigate }) => {
+export const AgentConfigScreen: React.FC<Props> = ({ onNavigate, currentScreen }) => {
    const [tools, setTools] = useState([
       { name: 'project_query', desc: 'Query a project (requires Docker + SHESHA_API_KEY)', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-500/20', checked: true },
       { name: 'project_upload', desc: 'Upload files into a project', icon: Box, color: 'text-orange-500', bg: 'bg-orange-500/20', checked: true },
@@ -38,22 +40,25 @@ export const AgentConfigScreen: React.FC<Props> = ({ onNavigate }) => {
 
    return (
       <div className="flex flex-col min-h-screen bg-background-dark text-white font-display">
-         <header className="flex items-center p-4 pb-2 justify-between sticky top-0 z-50 bg-background-dark/95 backdrop-blur-md border-b border-border-dark/30">
-            <button
-               onClick={() => onNavigate('agent-center')}
-               className="text-white flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-white/10 transition-colors"
-               title="Back to Agent Center"
-            >
-               <ChevronLeft size={24} />
-            </button>
-            <h2 className="text-white text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center">Agent Configuration</h2>
-            <button className="flex size-10 cursor-pointer items-center justify-center rounded-full hover:bg-white/10 text-white transition-colors" title="More actions">
-               <MoreVertical size={24} />
-            </button>
+         <header className="flex flex-col gap-2 p-4 pb-2 justify-between sticky top-0 z-50 bg-background-dark/95 backdrop-blur-md border-b border-border-dark/30">
+            <div className="flex items-center justify-between">
+               <button
+                  onClick={() => onNavigate('agent-center')}
+                  className="text-white flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-white/10 transition-colors"
+                  title="Back to Agent Center"
+               >
+                  <ChevronLeft size={24} />
+               </button>
+               <h2 className="text-white text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center">Agent Configuration</h2>
+               <button className="flex size-10 cursor-pointer items-center justify-center rounded-full hover:bg-white/10 text-white transition-colors" title="More actions">
+                  <MoreVertical size={24} />
+               </button>
+            </div>
+            <HeaderTabs currentScreen={currentScreen} onNavigate={onNavigate} />
          </header>
 
          {/* Segmented Control */}
-         <div className="px-4 py-3 sticky top-[64px] z-40 bg-background-dark">
+         <div className="px-4 py-3 sticky top-[96px] z-40 bg-background-dark">
             <div className="flex h-12 flex-1 items-center justify-center rounded-xl bg-[#254632] p-1 shadow-inner">
                <button className="flex h-full grow items-center justify-center rounded-lg px-2 text-[#94c7a8] text-sm font-medium transition-all hover:text-white">
                   My Agents

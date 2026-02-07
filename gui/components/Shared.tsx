@@ -6,8 +6,6 @@ import {
   Bot,
   MoreVertical,
   ChevronLeft,
-  Settings,
-  Menu,
   FileText
 } from 'lucide-react';
 import { ScreenName } from '../types';
@@ -85,6 +83,85 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentScreen, onNavigate 
   );
 };
 
+export const NAV_GROUPS: { label: string; items: { id: ScreenName; label: string }[] }[] = [
+  {
+    label: 'System',
+    items: [
+      { id: 'dashboard', label: 'Dashboard' },
+      { id: 'capabilities', label: 'Capabilities' },
+      { id: 'persistence', label: 'Persistence' },
+    ],
+  },
+  {
+    label: 'Setup',
+    items: [
+      { id: 'settings', label: 'Settings' },
+      { id: 'cli', label: 'CLI' },
+      { id: 'documentation', label: 'Docs' },
+    ],
+  },
+  {
+    label: 'Ingestion',
+    items: [
+      { id: 'mount-manager', label: 'Mounts' },
+      { id: 'staging-area', label: 'Staging' },
+    ],
+  },
+  {
+    label: 'Models',
+    items: [
+      { id: 'query-console', label: 'Query' },
+      { id: 'prompt-preview', label: 'Prompt' },
+      { id: 'operator-chat', label: 'Chat' },
+      { id: 'agent-center', label: 'Agents' },
+      { id: 'agent-config', label: 'Config' },
+      { id: 'live-interaction', label: 'Live' },
+    ],
+  },
+  {
+    label: 'Logs',
+    items: [{ id: 'message-monitor', label: 'Messages' }],
+  },
+];
+
+interface HeaderTabsProps {
+  currentScreen: ScreenName;
+  onNavigate: (screen: ScreenName) => void;
+}
+
+export const HeaderTabs: React.FC<HeaderTabsProps> = ({ currentScreen, onNavigate }) => (
+  <div className="flex items-center gap-4 overflow-x-auto no-scrollbar pb-1">
+    {NAV_GROUPS.map((group) => (
+      <div
+        key={group.label}
+        className="flex items-center gap-2 pr-4 border-r border-white/10 last:border-r-0"
+      >
+        <span className="text-[10px] uppercase tracking-wider text-gray-500">
+          {group.label}
+        </span>
+        <div className="flex items-center gap-1 rounded-full border border-white/10 bg-black/30 p-1">
+          {group.items.map((item) => {
+            const isActive = currentScreen === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => onNavigate(item.id)}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${isActive
+                  ? 'bg-primary text-black'
+                  : 'text-gray-300 hover:bg-white/10'
+                  }`}
+                title={`Go to ${item.label}`}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
 interface AppHeaderProps {
   title?: string;
   showBack?: boolean;
@@ -92,6 +169,8 @@ interface AppHeaderProps {
   rightAction?: React.ReactNode;
   subtitle?: string;
   icon?: React.ReactNode;
+  currentScreen?: ScreenName;
+  onNavigate?: (screen: ScreenName) => void;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
@@ -100,49 +179,57 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onBack,
   rightAction,
   subtitle,
-  icon
+  icon,
+  currentScreen,
+  onNavigate
 }) => {
   return (
-    <header className="flex-none px-5 pt-12 pb-4 flex items-center justify-between z-40 bg-background-dark/95 backdrop-blur-md sticky top-0 border-b border-border-dark">
-      <div className="flex items-center gap-3">
-        {showBack ? (
-          <button
-            onClick={onBack}
-            className="p-1 -ml-2 rounded-full hover:bg-white/10 transition-colors text-gray-300"
-            title="Go back"
-          >
-            <ChevronLeft size={28} />
-          </button>
-        ) : (
-          icon ? (
-            <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-              {icon}
-              <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
-              </span>
-            </div>
+    <header className="flex-none px-5 pt-4 pb-3 flex flex-col gap-2 z-40 bg-background-dark/95 backdrop-blur-md sticky top-0 border-b border-border-dark">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {showBack ? (
+            <button
+              onClick={onBack}
+              className="p-1 -ml-2 rounded-full hover:bg-white/10 transition-colors text-gray-300"
+              title="Go back"
+            >
+              <ChevronLeft size={24} />
+            </button>
           ) : (
-            <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-              <Terminal className="text-primary" size={20} />
-              <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
-              </span>
-            </div>
-          )
-        )}
+            icon ? (
+              <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                {icon}
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+                </span>
+              </div>
+            ) : (
+              <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                <Terminal className="text-primary" size={20} />
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+                </span>
+              </div>
+            )
+          )}
 
-        <div>
-          <h1 className="text-lg font-bold tracking-tight leading-none text-white">{title}</h1>
-          {subtitle && <p className="text-xs text-gray-400 font-mono mt-1">{subtitle}</p>}
+          <div>
+            <h1 className="text-lg font-bold tracking-tight leading-none text-white">{title}</h1>
+            {subtitle && <p className="text-xs text-gray-400 font-mono mt-1">{subtitle}</p>}
+          </div>
         </div>
+
+        {rightAction || (
+          <button className="p-2 rounded-full hover:bg-white/5 transition-colors text-gray-300" title="More actions">
+            <MoreVertical size={20} />
+          </button>
+        )}
       </div>
 
-      {rightAction || (
-        <button className="p-2 rounded-full hover:bg-white/5 transition-colors text-gray-300" title="More actions">
-          <MoreVertical size={20} />
-        </button>
+      {currentScreen && onNavigate && (
+        <HeaderTabs currentScreen={currentScreen} onNavigate={onNavigate} />
       )}
     </header>
   );

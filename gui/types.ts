@@ -13,7 +13,8 @@ export type ScreenName =
   | 'styling-preview'
   | 'mount-manager'
   | 'prompt-preview'
-  | 'documentation';
+  | 'documentation'
+  | 'settings';
 
 export interface LogEntry {
   timestamp: string;

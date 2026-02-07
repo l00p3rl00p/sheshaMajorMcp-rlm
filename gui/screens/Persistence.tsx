@@ -13,13 +13,14 @@ import {
   UploadCloud
 } from 'lucide-react';
 import { ScreenName } from '../types';
-import { ScanlineEffect } from '../components/Shared';
+import { HeaderTabs, ScanlineEffect } from '../components/Shared';
 
 interface Props {
   onNavigate: (screen: ScreenName) => void;
+  currentScreen: ScreenName;
 }
 
-export const PersistenceScreen: React.FC<Props> = ({ onNavigate }) => {
+export const PersistenceScreen: React.FC<Props> = ({ onNavigate, currentScreen }) => {
   const [activeTab, setActiveTab] = useState<'manifest' | 'storage' | 'logs'>('manifest');
 
   return (
@@ -42,6 +43,10 @@ export const PersistenceScreen: React.FC<Props> = ({ onNavigate }) => {
           >
             <UploadCloud size={24} />
           </button>
+        </div>
+
+        <div className="px-4 pb-2">
+          <HeaderTabs currentScreen={currentScreen} onNavigate={onNavigate} />
         </div>
         
         {/* Status */}

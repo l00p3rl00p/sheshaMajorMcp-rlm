@@ -21,7 +21,12 @@ def create_app() -> FastAPI:
     # Configure CORS for local development
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],  # Vite dev server
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -57,7 +62,12 @@ def create_app() -> FastAPI:
     # Auth dependency
     api_key_header = APIKeyHeader(name="X-Bridge-Key", auto_error=False)
 
-    async def verify_bridge_key(api_key: str = Security(api_key_header)):
+    async def verify_bridge_key(
+        request: Request,
+        api_key: str = Security(api_key_header),
+    ):
+        if request.method == "OPTIONS":
+            return api_key
         expected = get_or_create_bridge_secret()
         if api_key != expected:
             raise HTTPException(

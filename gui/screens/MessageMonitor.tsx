@@ -9,12 +9,14 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { ScreenName } from '../types';
+import { HeaderTabs } from '../components/Shared';
 
 interface Props {
   onNavigate: (screen: ScreenName) => void;
+  currentScreen: ScreenName;
 }
 
-export const MessageMonitorScreen: React.FC<Props> = ({ onNavigate }) => {
+export const MessageMonitorScreen: React.FC<Props> = ({ onNavigate, currentScreen }) => {
   const [activeFilter, setActiveFilter] = useState('LIVE');
   const [expandedNodes, setExpandedNodes] = useState<Set<number>>(new Set());
 
@@ -42,16 +44,19 @@ export const MessageMonitorScreen: React.FC<Props> = ({ onNavigate }) => {
          backgroundSize: '40px 40px'
       }}></div>
 
-      <header className="flex items-center justify-between px-4 py-4 relative z-20">
-        <div className="flex items-center gap-3">
-           <button onClick={() => onNavigate('agent-center')} className="hover:bg-white/10 p-1 rounded-full transition-colors" title="Back to Agent Center">
-              <ArrowLeft size={24} className="text-white" />
-           </button>
-           <h1 className="text-xl font-bold">Message Monitor</h1>
+      <header className="flex flex-col gap-2 px-4 py-3 relative z-20">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+             <button onClick={() => onNavigate('agent-center')} className="hover:bg-white/10 p-1 rounded-full transition-colors" title="Back to Agent Center">
+                <ArrowLeft size={24} className="text-white" />
+             </button>
+             <h1 className="text-xl font-bold">Message Monitor</h1>
+          </div>
+          <button className="text-gray-400 hover:text-white" title="Open settings">
+             <Settings size={24} />
+          </button>
         </div>
-        <button className="text-gray-400 hover:text-white" title="Open settings">
-           <Settings size={24} />
-        </button>
+        <HeaderTabs currentScreen={currentScreen} onNavigate={onNavigate} />
       </header>
 
       {/* Filters */}

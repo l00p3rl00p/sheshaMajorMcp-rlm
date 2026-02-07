@@ -36,15 +36,16 @@ import {
    Power
 } from 'lucide-react';
 import { ScreenName } from '../types';
-import { BottomNav, ScanlineEffect } from '../components/Shared';
+import { BottomNav, HeaderTabs, ScanlineEffect } from '../components/Shared';
 
 interface Props {
    onNavigate: (screen: ScreenName) => void;
+   currentScreen: ScreenName;
 }
 
 type ViewMode = 'standard' | 'operator' | 'debug';
 
-export const AgentCenterScreen: React.FC<Props> = ({ onNavigate }) => {
+export const AgentCenterScreen: React.FC<Props> = ({ onNavigate, currentScreen }) => {
    const [viewMode, setViewMode] = useState<ViewMode>('standard');
 
    return (
@@ -69,63 +70,67 @@ export const AgentCenterScreen: React.FC<Props> = ({ onNavigate }) => {
          )}
 
          {/* Unified Header with Reframe Toggle */}
-         <header className="flex-none px-4 pt-12 pb-3 flex items-center justify-between z-30 bg-surface-dark/80 backdrop-blur-md border-b border-border-dark transition-all duration-300">
-            {viewMode === 'operator' ? (
-               <button className="p-2 text-gray-400 hover:text-white transition-colors" title="Open navigation">
-                  <Menu size={24} />
-               </button>
-            ) : (
-               <div className="flex items-center gap-3">
-                  <button className="p-1.5 rounded-md hover:bg-white/5 transition-colors text-gray-400" title="Open menu">
+         <header className="flex-none px-4 pt-4 pb-2 flex flex-col gap-2 z-30 bg-surface-dark/80 backdrop-blur-md border-b border-border-dark transition-all duration-300">
+            <div className="flex items-center justify-between">
+               {viewMode === 'operator' ? (
+                  <button className="p-2 text-gray-400 hover:text-white transition-colors" title="Open navigation">
                      <Menu size={24} />
                   </button>
-                  <div>
-                     <h1 className="text-sm font-bold tracking-widest uppercase text-white">Shesha<span className="text-primary">RLM</span></h1>
-                     <div className="flex items-center gap-2">
-                        <span className={`w-1.5 h-1.5 rounded-full ${viewMode === 'debug' ? 'bg-primary animate-pulse' : 'bg-primary'}`}></span>
-                        <p className="text-[10px] text-primary/80 font-mono">v0.3.1</p>
+               ) : (
+                  <div className="flex items-center gap-3">
+                     <button className="p-1.5 rounded-md hover:bg-white/5 transition-colors text-gray-400" title="Open menu">
+                        <Menu size={24} />
+                     </button>
+                     <div>
+                        <h1 className="text-sm font-bold tracking-widest uppercase text-white">Shesha<span className="text-primary">RLM</span></h1>
+                        <div className="flex items-center gap-2">
+                           <span className={`w-1.5 h-1.5 rounded-full ${viewMode === 'debug' ? 'bg-primary animate-pulse' : 'bg-primary'}`}></span>
+                           <p className="text-[10px] text-primary/80 font-mono">v0.3.1</p>
+                        </div>
                      </div>
                   </div>
-               </div>
-            )}
+               )}
 
-            {/* Reframe Toggle */}
-            <div className="flex bg-black/40 border border-white/10 rounded-lg p-0.5 backdrop-blur-sm">
-               <button
-                  onClick={() => setViewMode('standard')}
-                  className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${viewMode === 'standard' ? 'bg-white/10 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}
-                  title="Switch to Standard view"
-               >
-                  Std
-               </button>
-               <button
-                  onClick={() => setViewMode('debug')}
-                  className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${viewMode === 'debug' ? 'bg-primary/20 text-primary shadow-[0_0_10px_rgba(28,227,108,0.2)]' : 'text-gray-500 hover:text-gray-300'}`}
-                  title="Switch to Debug view"
-               >
-                  Debug
-               </button>
-               <button
-                  onClick={() => setViewMode('operator')}
-                  className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${viewMode === 'operator' ? 'bg-primary text-black shadow-[0_0_10px_rgba(28,227,108,0.4)]' : 'text-gray-500 hover:text-gray-300'}`}
-                  title="Switch to Operator view"
-               >
-                  Op
-               </button>
-            </div>
-
-            {viewMode === 'operator' ? (
-               <div className="relative">
-                  <span className="absolute top-0 right-0 w-2 h-2 bg-primary rounded-full"></span>
-                  <Bot size={24} className="text-gray-400" />
-               </div>
-            ) : (
-               <div className="flex items-center gap-2">
-                  <button className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-colors" title="Open settings">
-                     <Settings size={18} />
+               {/* Reframe Toggle */}
+               <div className="flex bg-black/40 border border-white/10 rounded-lg p-0.5 backdrop-blur-sm">
+                  <button
+                     onClick={() => setViewMode('standard')}
+                     className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${viewMode === 'standard' ? 'bg-white/10 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}
+                     title="Switch to Standard view"
+                  >
+                     Std
+                  </button>
+                  <button
+                     onClick={() => setViewMode('debug')}
+                     className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${viewMode === 'debug' ? 'bg-primary/20 text-primary shadow-[0_0_10px_rgba(28,227,108,0.2)]' : 'text-gray-500 hover:text-gray-300'}`}
+                     title="Switch to Debug view"
+                  >
+                     Debug
+                  </button>
+                  <button
+                     onClick={() => setViewMode('operator')}
+                     className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${viewMode === 'operator' ? 'bg-primary text-black shadow-[0_0_10px_rgba(28,227,108,0.4)]' : 'text-gray-500 hover:text-gray-300'}`}
+                     title="Switch to Operator view"
+                  >
+                     Op
                   </button>
                </div>
-            )}
+
+               {viewMode === 'operator' ? (
+                  <div className="relative">
+                     <span className="absolute top-0 right-0 w-2 h-2 bg-primary rounded-full"></span>
+                     <Bot size={24} className="text-gray-400" />
+                  </div>
+               ) : (
+                  <div className="flex items-center gap-2">
+                     <button className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-colors" title="Open settings">
+                        <Settings size={18} />
+                     </button>
+                  </div>
+               )}
+            </div>
+
+            <HeaderTabs currentScreen={currentScreen} onNavigate={onNavigate} />
          </header>
 
          {/* Main Content Area */}
@@ -598,7 +603,7 @@ export const AgentCenterScreen: React.FC<Props> = ({ onNavigate }) => {
             )}
          </main>
 
-         <BottomNav currentScreen="agent-center" onNavigate={onNavigate} />
+         <BottomNav currentScreen={currentScreen} onNavigate={onNavigate} />
       </div>
    );
 };
