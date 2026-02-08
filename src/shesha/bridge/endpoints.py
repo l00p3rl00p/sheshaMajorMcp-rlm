@@ -12,6 +12,8 @@ from shesha.bridge.models import (
     QueryRequest,
     QueryResponse,
     ManifestDirUpdateRequest,
+    CapabilitiesResponse,
+    ToolInfo,
 )
 from shesha.exceptions import ProjectExistsError
 from shesha.librarian.core import LibrarianCore, ValidationError
@@ -66,6 +68,30 @@ async def get_settings(request: Request):
     config = load_config(paths)
     manifest_dir = (config.manifest_dir or Path.cwd()).expanduser().resolve()
     return SettingsResponse(manifest_dir=str(manifest_dir), configured=config.manifest_dir is not None)
+
+
+@router.get("/capabilities", response_model=CapabilitiesResponse)
+@limiter.limit("100/minute")
+async def get_capabilities(request: Request):
+    """Return MCP tool definitions and system prompt preview.
+    
+    This endpoint exposes read-only information about what the CLI/MCP can do.
+    The GUI displays this information without duplicating the definitions.
+    """
+    from shesha.librarian.mcp import _tool_defs
+    
+    tools = [ToolInfo(name=t.name, description=t.description) for t in _tool_defs()]
+    
+    # Get system prompt preview (first 500 chars)
+    try:
+        from shesha.prompts.loader import PromptLoader
+        loader = PromptLoader()
+        raw_prompt = loader.get_raw_template("system.md")
+        preview = raw_prompt[:500] + "..." if len(raw_prompt) > 500 else raw_prompt
+    except Exception:
+        preview = "[System prompt not available]"
+    
+    return CapabilitiesResponse(tools=tools, system_prompt_preview=preview)
 
 
 @router.put("/settings/manifest-dir", response_model=SettingsResponse)

@@ -13,6 +13,7 @@ import { AppHeader, BottomNav } from '../components/Shared';
 import { ScreenName } from '../types';
 
 import { BridgeClient } from '../src/api/client';
+import { useBridgeEvents } from '../src/hooks/useBridgeEvents';
 
 interface Props {
   onNavigate: (screen: ScreenName) => void;
@@ -21,6 +22,18 @@ interface Props {
 
 export const DashboardScreen: React.FC<Props> = ({ onNavigate, currentScreen }) => {
   const [health, setHealth] = React.useState({ status: 'connecting', docker_available: false, version: '...' });
+  const events = useBridgeEvents(10);
+
+  const formatEventLabel = (method: string, type: string) => {
+    const labels: Record<string, string> = {
+      'health': 'MCP_HEALTH_OK',
+      'manifest': 'MANIFEST_LOADED',
+      'projects': 'PROJECTS_LIST_OK',
+      'settings': 'SETTINGS_LOADED'
+    };
+    if (type === 'err') return `${method.toUpperCase()}_ERROR`;
+    return labels[method] || method.toUpperCase();
+  };
 
   React.useEffect(() => {
     const check = async () => {
@@ -124,26 +137,18 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate, currentScreen }) 
           <div className="bg-black rounded-xl border border-border-dark p-4 font-mono text-xs overflow-hidden relative shadow-inner">
             <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/5 to-transparent opacity-10 pointer-events-none"></div>
             <ul className="space-y-2 relative z-10">
-              <li className="flex gap-3 text-primary/90">
-                <span className="opacity-50">[14:02:31]</span>
-                <span>MCP_HEALTH_OK</span>
-              </li>
-              <li className="flex gap-3 text-gray-400">
-                <span className="opacity-50">[14:02:30]</span>
-                <span>MANIFEST_LOADED</span>
-              </li>
-              <li className="flex gap-3 text-gray-400">
-                <span className="opacity-50">[14:02:25]</span>
-                <span>PROJECTS_LIST_OK</span>
-              </li>
-              <li className="flex gap-3 text-gray-500">
-                <span className="opacity-50">[14:02:22]</span>
-                <span>DOCKER_CHECK_WARN</span>
-              </li>
-              <li className="flex gap-3 text-gray-600">
-                <span className="opacity-50">[14:01:58]</span>
-                <span>LOGS_PATH_READY</span>
-              </li>
+              {events.slice(0, 5).map((event, idx) => (
+                <li key={event.id} className={`flex gap-3 ${idx === 0 ? 'text-primary/90' : idx === 1 ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <span className="opacity-50">[{new Date(event.timestamp).toLocaleTimeString([], { hour12: false })}]</span>
+                  <span>{formatEventLabel(event.method, event.type)}</span>
+                </li>
+              ))}
+              {events.length === 0 && (
+                <li className="flex gap-3 text-gray-600">
+                  <span className="opacity-50">[--:--:--]</span>
+                  <span>NO_EVENTS_YET</span>
+                </li>
+              )}
             </ul>
           </div>
         </section>

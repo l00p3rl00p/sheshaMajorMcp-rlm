@@ -54,3 +54,14 @@ class CommandPlan(BaseModel):
 
 class ExecuteRequest(BaseModel):
     token: str
+
+
+class ToolInfo(BaseModel):
+    name: str
+    description: str
+
+
+class CapabilitiesResponse(BaseModel):
+    tools: List[ToolInfo]
+    system_prompt_preview: str
+

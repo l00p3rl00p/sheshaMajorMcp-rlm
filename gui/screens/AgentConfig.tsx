@@ -1,26 +1,22 @@
 /**
  * Agent Configuration Screen
  * 
- * PROTOTYPE: Currently manages local UI state for tool visibility and system prompts.
- * In production, these changes would be deployed to the librarian configuration file via the MCP server.
+ * Displays MCP tool capabilities fetched from the CLI backend.
+ * This is a READ-ONLY view of CLI-owned definitions.
+ * GUI does not duplicate or modify these definitions.
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
    ChevronLeft,
    MoreVertical,
-   Fingerprint,
    Terminal,
    Wrench,
-   FileText,
-   Box,
-   Trash2,
-   Cpu,
-   History,
-   ExternalLink,
-   Save
+   Info,
+   Loader2
 } from 'lucide-react';
 import { ScreenName } from '../types';
 import { HeaderTabs } from '../components/Shared';
+import { BridgeClient, ToolInfo } from '../src/api/client';
 
 interface Props {
    onNavigate: (screen: ScreenName) => void;
@@ -28,15 +24,22 @@ interface Props {
 }
 
 export const AgentConfigScreen: React.FC<Props> = ({ onNavigate, currentScreen }) => {
-   const [tools, setTools] = useState([
-      { name: 'project_query', desc: 'Query a project (requires Docker + SHESHA_API_KEY)', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-500/20', checked: true },
-      { name: 'project_upload', desc: 'Upload files into a project', icon: Box, color: 'text-orange-500', bg: 'bg-orange-500/20', checked: true },
-      { name: 'project_delete', desc: 'Delete a project (destructive)', icon: Trash2, color: 'text-red-500', bg: 'bg-red-500/20', checked: false },
-   ]);
+   const [tools, setTools] = useState<ToolInfo[]>([]);
+   const [systemPromptPreview, setSystemPromptPreview] = useState<string>('');
+   const [isLoading, setIsLoading] = useState(true);
 
-   const toggleTool = (name: string) => {
-      setTools(tools.map(t => t.name === name ? { ...t, checked: !t.checked } : t));
-   };
+   useEffect(() => {
+      const fetchCapabilities = async () => {
+         setIsLoading(true);
+         const data = await BridgeClient.getCapabilities();
+         if (data) {
+            setTools(data.tools);
+            setSystemPromptPreview(data.system_prompt_preview);
+         }
+         setIsLoading(false);
+      };
+      fetchCapabilities();
+   }, []);
 
    return (
       <div className="flex flex-col min-h-screen bg-background-dark text-white font-display">
@@ -49,7 +52,7 @@ export const AgentConfigScreen: React.FC<Props> = ({ onNavigate, currentScreen }
                >
                   <ChevronLeft size={24} />
                </button>
-               <h2 className="text-white text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center">Agent Configuration</h2>
+               <h2 className="text-white text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center">MCP Capabilities</h2>
                <button className="flex size-10 cursor-pointer items-center justify-center rounded-full hover:bg-white/10 text-white transition-colors" title="More actions">
                   <MoreVertical size={24} />
                </button>
@@ -57,155 +60,69 @@ export const AgentConfigScreen: React.FC<Props> = ({ onNavigate, currentScreen }
             <HeaderTabs currentScreen={currentScreen} onNavigate={onNavigate} />
          </header>
 
-         {/* Segmented Control */}
-         <div className="px-4 py-3 sticky top-[96px] z-40 bg-background-dark">
-            <div className="flex h-12 flex-1 items-center justify-center rounded-xl bg-[#254632] p-1 shadow-inner">
-               <button className="flex h-full grow items-center justify-center rounded-lg px-2 text-[#94c7a8] text-sm font-medium transition-all hover:text-white">
-                  My Agents
-               </button>
-               <button className="flex h-full grow items-center justify-center rounded-lg px-2 bg-[#122118] shadow-sm text-primary text-sm font-bold ring-1 ring-white/10">
-                  Configuration
-               </button>
-               <button className="flex h-full grow items-center justify-center rounded-lg px-2 text-[#94c7a8] text-sm font-medium transition-all hover:text-white">
-                  Registry
-               </button>
-            </div>
+         {/* Info Banner */}
+         <div className="mx-4 mt-4 p-3 rounded-xl bg-blue-900/30 border border-blue-500/30 flex items-start gap-3">
+            <Info size={20} className="text-blue-400 mt-0.5 shrink-0" />
+            <p className="text-sm text-blue-200">
+               This view shows MCP tools defined by the CLI. These are read-only; the GUI displays what the CLI provides.
+            </p>
          </div>
 
-         <main className="flex-1 flex flex-col gap-6 pb-24 px-4 pt-2">
-            {/* Persona Hero */}
-            <div className="flex flex-col gap-4 p-5 rounded-2xl bg-surface-dark border border-border-dark shadow-sm relative overflow-hidden group">
-               <div className="absolute -right-10 -top-10 w-32 h-32 bg-primary/20 rounded-full blur-3xl pointer-events-none group-hover:bg-primary/30 transition-all duration-500"></div>
-               <div className="flex items-start justify-between z-10">
-                  <div className="flex gap-4 items-center">
-                     <div className="relative">
-                        <div className="bg-center bg-no-repeat aspect-square bg-cover rounded-xl w-16 h-16 shadow-lg ring-2 ring-border-dark bg-gradient-to-br from-green-900 to-black flex items-center justify-center">
-                           <Box size={32} className="text-primary opacity-80" />
+         <main className="flex-1 flex flex-col gap-6 pb-8 px-4 pt-4">
+            {isLoading ? (
+               <div className="flex items-center justify-center py-12">
+                  <Loader2 size={32} className="animate-spin text-primary" />
+               </div>
+            ) : (
+               <>
+                  {/* System Prompt Preview */}
+                  <section className="flex flex-col gap-3">
+                     <div className="flex items-center justify-between">
+                        <h3 className="text-white text-base font-bold flex items-center gap-2">
+                           <Terminal className="text-primary" size={20} />
+                           System Prompt (Preview)
+                        </h3>
+                        <span className="text-xs text-gray-400 font-mono">prompts/system.md</span>
+                     </div>
+                     <div className="relative group">
+                        <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-[#254632] rounded-xl opacity-30 blur transition duration-200"></div>
+                        <div className="relative w-full rounded-xl text-sm font-mono leading-relaxed bg-[#0d1612] text-[#d4ffe5] border border-[#356448] min-h-[160px] p-4 shadow-inner whitespace-pre-wrap overflow-auto max-h-[300px]">
+                           {systemPromptPreview || '[Not available]'}
                         </div>
-                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-primary border-2 border-surface-dark rounded-full animate-pulse"></div>
                      </div>
-                     <div className="flex flex-col">
-                        <h3 className="text-white text-xl font-bold leading-tight">DevOps Specialist</h3>
-                        <p className="text-[#94c7a8] text-xs font-mono mt-1 flex items-center gap-1">
-                           <Fingerprint size={12} /> ID: 8492-A
-                        </p>
-                     </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                     <span className="px-2 py-1 rounded-md bg-primary/20 text-primary text-xs font-bold uppercase tracking-wider border border-primary/20">Active</span>
-                     <span className="text-[10px] text-gray-500">Synced: 2m ago</span>
-                  </div>
-               </div>
-            </div>
+                  </section>
 
-            {/* System Prompt */}
-            <section className="flex flex-col gap-3">
-               <div className="flex items-center justify-between">
-                  <h3 className="text-white text-base font-bold flex items-center gap-2">
-                     <Terminal className="text-primary" size={20} />
-                     System Prompt
-                  </h3>
-                  <button className="text-xs font-medium text-primary hover:text-primary/80 transition-colors" title="Edit system prompt">Edit Prompt</button>
-               </div>
-               <div className="relative group">
-                  <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-[#254632] rounded-xl opacity-30 group-hover:opacity-50 blur transition duration-200"></div>
-                  <textarea
-                     className="relative w-full resize-none rounded-xl text-sm font-mono leading-relaxed bg-[#0d1612] text-[#d4ffe5] border border-[#356448] focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none min-h-[160px] p-4 shadow-inner"
-                     spellCheck="false"
-                     defaultValue={`You are an expert DevOps engineer specializing in Docker and Kubernetes orchestration. \n\nYour goal is to assist developers in debugging containerized applications, optimizing Dockerfiles, and managing cluster resources safely.`}
-                  />
-                  <div className="absolute bottom-3 right-3 flex gap-2">
-                     <span className="text-[10px] bg-[#1a3224] text-[#94c7a8] px-2 py-0.5 rounded border border-[#356448]">CLI Mode</span>
-                  </div>
-               </div>
-            </section>
-
-            {/* Tool Access Control */}
-            <section className="flex flex-col gap-3">
-               <div className="flex items-center justify-between">
-                  <h3 className="text-white text-base font-bold flex items-center gap-2">
-                     <Wrench className="text-primary" size={20} />
-                     Tool Access Control
-                  </h3>
-                  <span className="text-xs text-gray-400">MCP Verbs</span>
-               </div>
-               <div className="bg-surface-dark rounded-2xl border border-border-dark overflow-hidden divide-y divide-border-dark/50">
-                  {tools.map((tool) => (
-                     <div
-                        key={tool.name}
-                        className="p-4 flex items-center justify-between hover:bg-[#254632]/50 transition-colors cursor-pointer"
-                        onClick={() => toggleTool(tool.name)}
-                        title={`Toggle ${tool.name}`}
-                     >
-                        <div className="flex gap-3 items-center">
-                           <div className={`w-10 h-10 rounded-lg ${tool.bg} ${tool.color} flex items-center justify-center`}>
-                              <tool.icon size={20} />
-                           </div>
-                           <div className="flex flex-col">
-                              <span className="text-sm font-semibold text-white font-mono">{tool.name}</span>
-                              <span className="text-xs text-[#94c7a8]">{tool.desc}</span>
-                           </div>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer pointer-events-none">
-                           <input type="checkbox" checked={tool.checked} readOnly className="sr-only peer" />
-                           <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                        </label>
+                  {/* Tool Definitions */}
+                  <section className="flex flex-col gap-3">
+                     <div className="flex items-center justify-between">
+                        <h3 className="text-white text-base font-bold flex items-center gap-2">
+                           <Wrench className="text-primary" size={20} />
+                           MCP Tools ({tools.length})
+                        </h3>
+                        <span className="text-xs text-gray-400">From CLI _tool_defs()</span>
                      </div>
-                  ))}
-               </div>
-            </section>
-
-            {/* Memory Stats */}
-            <section className="flex flex-col gap-3">
-               <div className="flex items-center justify-between">
-                  <h3 className="text-white text-base font-bold flex items-center gap-2">
-                     <Cpu className="text-primary" size={20} />
-                     Memory & Context
-                  </h3>
-               </div>
-               <div className="bg-slate-900 text-white rounded-2xl p-5 shadow-lg relative overflow-hidden">
-                  <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#1ce36c 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
-                  <div className="flex items-center justify-between mb-2 relative z-10">
-                     <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Token Window</span>
-                     <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">49% Used</span>
-                  </div>
-                  <div className="flex items-end gap-1 mb-4 relative z-10">
-                     <span className="text-2xl font-mono font-bold">4,021</span>
-                     <span className="text-sm text-gray-400 mb-1">/ 8,192</span>
-                  </div>
-                  <div className="h-2 w-full bg-slate-700 rounded-full overflow-hidden relative z-10">
-                     <div className="h-full bg-primary w-[49%] shadow-[0_0_10px_rgba(28,227,108,0.5)]"></div>
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-slate-700 flex justify-between items-center relative z-10">
-                     <div className="flex items-center gap-2 text-xs text-gray-300">
-                        <History size={14} />
-                        <span>Context size: 12MB</span>
+                     <div className="bg-surface-dark rounded-2xl border border-border-dark overflow-hidden divide-y divide-border-dark/50">
+                        {tools.length === 0 ? (
+                           <div className="p-4 text-center text-gray-400">No tools available</div>
+                        ) : (
+                           tools.map((tool) => (
+                              <div
+                                 key={tool.name}
+                                 className="p-4 flex items-center justify-between"
+                              >
+                                 <div className="flex flex-col">
+                                    <span className="text-sm font-semibold text-white font-mono">{tool.name}</span>
+                                    <span className="text-xs text-[#94c7a8]">{tool.description}</span>
+                                 </div>
+                                 <span className="text-xs px-2 py-1 rounded bg-primary/20 text-primary border border-primary/20">MCP</span>
+                              </div>
+                           ))
+                        )}
                      </div>
-                     <button className="flex items-center gap-1 text-xs text-primary font-medium hover:underline" title="Open manifest">
-                        View Manifest
-                        <ExternalLink size={12} />
-                     </button>
-                  </div>
-               </div>
-            </section>
+                  </section>
+               </>
+            )}
          </main>
-
-         {/* Footer Actions */}
-         <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-background-dark border-t border-border-dark backdrop-blur-xl bg-opacity-90 z-50">
-            <div className="flex gap-3">
-               <button className="flex-1 h-12 rounded-xl bg-surface-dark text-white font-semibold text-sm hover:brightness-110 transition-all active:scale-[0.98]" title="Revert changes">
-                  Revert
-               </button>
-               <button
-                  onClick={() => onNavigate('agent-center')}
-                  className="flex-[2] h-12 rounded-xl bg-primary text-background-dark font-bold text-sm shadow-[0_0_15px_rgba(28,227,108,0.3)] hover:shadow-[0_0_25px_rgba(28,227,108,0.5)] transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
-                  title="Deploy agent configuration changes"
-               >
-                  <Save size={18} />
-                  Deploy Changes
-               </button>
-            </div>
-         </div>
       </div>
    );
 };

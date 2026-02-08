@@ -29,9 +29,94 @@ export interface QueryResponse {
     answer: string;
 }
 
+export interface ToolInfo {
+    name: string;
+    description: string;
+}
+
+export interface CapabilitiesResponse {
+    tools: ToolInfo[];
+    system_prompt_preview: string;
+}
+
+// --- Event Bus ---
+export type BridgeEventType = 'req' | 'res' | 'err';
+
+export interface BridgeEvent {
+    id: string;
+    timestamp: number;
+    type: BridgeEventType;
+    method: string;
+    payload?: any;
+    duration?: number; // for responses
+}
+
+type BridgeEventListener = (event: BridgeEvent) => void;
+
 const BASE_URL = 'http://127.0.0.1:8000/api';
 
 export class BridgeClient {
+    private static listeners: BridgeEventListener[] = [];
+
+    static subscribe(listener: BridgeEventListener): () => void {
+        this.listeners.push(listener);
+        return () => {
+            this.listeners = this.listeners.filter(l => l !== listener);
+        };
+    }
+
+    private static emit(event: BridgeEvent) {
+        this.listeners.forEach(l => l(event));
+    }
+
+    private static async request<T>(method: string, endpoint: string, body?: any): Promise<T> {
+        const id = Math.random().toString(36).substring(7);
+        const start = Date.now();
+        const EventMethod = endpoint.replace('/api/', ''); // simplified method name
+
+        this.emit({
+            id,
+            timestamp: start,
+            type: 'req',
+            method: EventMethod,
+            payload: body
+        });
+
+        try {
+            const response = await fetch(`${BASE_URL}${endpoint}`, {
+                method,
+                headers: this.getAuthHeaders(),
+                body: body ? JSON.stringify(body) : undefined
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || response.statusText);
+            }
+
+            const data = await response.json();
+            this.emit({
+                id,
+                timestamp: Date.now(),
+                type: 'res',
+                method: EventMethod,
+                payload: data,
+                duration: Date.now() - start
+            });
+            return data;
+        } catch (e: any) {
+            this.emit({
+                id,
+                timestamp: Date.now(),
+                type: 'err',
+                method: EventMethod,
+                payload: { message: e.message },
+                duration: Date.now() - start
+            });
+            throw e;
+        }
+    }
+
     static getBridgeKey(): string {
         return localStorage.getItem('shesha_bridge_key') || '';
     }
@@ -68,11 +153,7 @@ export class BridgeClient {
 
     static async checkHealth(): Promise<HealthResponse> {
         try {
-            const response = await fetch(`${BASE_URL}/health`, {
-                headers: this.getAuthHeaders()
-            });
-            if (!response.ok) throw new Error('Bridge unreachable');
-            return await response.json();
+            return await this.request<HealthResponse>('GET', '/health');
         } catch (e) {
             return { status: 'disconnected', docker_available: false, version: '0.0.0', api_key_configured: false };
         }
@@ -80,11 +161,7 @@ export class BridgeClient {
 
     static async getProjects(): Promise<Project[]> {
         try {
-            const response = await fetch(`${BASE_URL}/projects`, {
-                headers: this.getAuthHeaders()
-            });
-            if (!response.ok) throw new Error('Failed to list projects');
-            return await response.json();
+            return await this.request<Project[]>('GET', '/projects');
         } catch (e) {
             console.error("Bridge Error:", e);
             return [];
@@ -93,13 +170,7 @@ export class BridgeClient {
 
     static async createProject(project_id: string, mount_path: string): Promise<Project | null> {
         try {
-            const response = await fetch(`${BASE_URL}/projects`, {
-                method: 'POST',
-                headers: this.getAuthHeaders(),
-                body: JSON.stringify({ project_id, mount_path })
-            });
-            if (!response.ok) throw new Error('Failed to create project');
-            return await response.json();
+            return await this.request<Project>('POST', '/projects', { project_id, mount_path });
         } catch (e) {
             console.error("Bridge Error:", e);
             return null;
@@ -108,11 +179,8 @@ export class BridgeClient {
 
     static async deleteProject(project_id: string): Promise<boolean> {
         try {
-            const response = await fetch(`${BASE_URL}/projects/${encodeURIComponent(project_id)}`, {
-                method: 'DELETE',
-                headers: this.getAuthHeaders()
-            });
-            return response.ok;
+            await this.request('DELETE', `/projects/${encodeURIComponent(project_id)}`);
+            return true;
         } catch (e) {
             console.error("Bridge Error:", e);
             return false;
@@ -121,13 +189,7 @@ export class BridgeClient {
 
     static async queryProject(project_id: string, question: string): Promise<QueryResponse | null> {
         try {
-            const response = await fetch(`${BASE_URL}/query`, {
-                method: 'POST',
-                headers: this.getAuthHeaders(),
-                body: JSON.stringify({ project_id, question })
-            });
-            if (!response.ok) throw new Error('Query failed');
-            return await response.json();
+            return await this.request<QueryResponse>('POST', '/query', { project_id, question });
         } catch (e) {
             console.error("Bridge Error:", e);
             return null;
@@ -136,11 +198,7 @@ export class BridgeClient {
 
     static async getManifest(): Promise<ManifestStatus> {
         try {
-            const response = await fetch(`${BASE_URL}/manifest`, {
-                headers: this.getAuthHeaders()
-            });
-            if (!response.ok) throw new Error('Failed to get manifest');
-            return await response.json();
+            return await this.request<ManifestStatus>('GET', '/manifest');
         } catch (e) {
             return { exists: false, valid: false, expected_path: '', manifest_dir: '', configured: false };
         }
@@ -148,11 +206,7 @@ export class BridgeClient {
 
     static async getSettings(): Promise<SettingsResponse | null> {
         try {
-            const response = await fetch(`${BASE_URL}/settings`, {
-                headers: this.getAuthHeaders()
-            });
-            if (!response.ok) throw new Error('Failed to get settings');
-            return await response.json();
+            return await this.request<SettingsResponse>('GET', '/settings');
         } catch (e) {
             return null;
         }
@@ -160,13 +214,16 @@ export class BridgeClient {
 
     static async setManifestDir(manifest_dir: string): Promise<SettingsResponse | null> {
         try {
-            const response = await fetch(`${BASE_URL}/settings/manifest-dir`, {
-                method: 'PUT',
-                headers: this.getAuthHeaders(),
-                body: JSON.stringify({ manifest_dir })
-            });
-            if (!response.ok) throw new Error('Failed to update manifest dir');
-            return await response.json();
+            return await this.request<SettingsResponse>('PUT', '/settings/manifest-dir', { manifest_dir });
+        } catch (e) {
+            console.error("Bridge Error:", e);
+            return null;
+        }
+    }
+
+    static async getCapabilities(): Promise<CapabilitiesResponse | null> {
+        try {
+            return await this.request<CapabilitiesResponse>('GET', '/capabilities');
         } catch (e) {
             console.error("Bridge Error:", e);
             return null;
