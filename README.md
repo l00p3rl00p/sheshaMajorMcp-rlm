@@ -100,38 +100,26 @@ So far it seems to work, but it's only been tested with .txt documents and the O
 Before running the GUI, confirm the critical dependencies are running:
 
 1. `Docker` must be started (Docker Desktop, Colima, or Podman). Install/launch before proceeding.
-2. Run the bridge API, which proxies CLI commands:
+2. Run the bridge server, which serves both the API and the GUI:
 
 ```bash
-python -m shesha.librarian bridge
+librarian bridge
 ```
 
-   - The bridge listens on `http://127.0.0.1:8000` and exposes `/api/*` for the GUI.
-3. Open the GUI (uses the same bridge key for authentication):
+   - The bridge listens on `http://127.0.0.1:8000` and serves the production-ready GUI directly.
+3. Open the GUI in your browser:
 
 ```bash
-python -m shesha.librarian gui
+librarian gui
 ```
 
-   - This launches the browser pointing at `http://localhost:${LIBRARIAN_GUI_PORT:-3000}`.
-   - If you prefer the Vite dev server, you can run it separately inside `gui/`:
-     ```bash
-     cd gui
-     npm install
-     npm run dev
-     ```
-
+   - This launches the browser pointing at `http://localhost:8000`.
+   - The command includes a 10-second retry loop to gracefully wait for the Bridge to initialize.
    - The GUI health audit panel shows Docker, bridge, and manifest status and lets you recheck dependencies without leaving the UI.
 
-## Optional GUI (Operator Dashboard)
+## Optional GUI (Production-Ready Operator Dashboard)
 
-The GUI is the operator dashboard and sits in the `gui/` folder:
-
-```bash
-cd gui
-npm install
-npm run dev
-```
+The GUI is a fully self-contained, production-ready operator dashboard bundled within the project. It features zero external runtime dependencies and is 100% offline-capable.
 
 ---
 

@@ -557,9 +557,8 @@ def _print_install_summary(*, paths: LibrarianPaths, manifest_dir: Path) -> None
     print("  Headless query:")
     print('    python -m shesha.librarian query --project <project_id> "<question>"\n')
     print("GUI + Bridge:")
-    print("    python -m shesha.librarian bridge  # starts API on http://127.0.0.1:8000")
-    print("    python -m shesha.librarian gui     # opens GUI on http://localhost:$LIBRARIAN_GUI_PORT")
-    print("    npm run dev (inside gui/)  # optional operator UI (Vite chooses the port)")
+    print("    python -m shesha.librarian bridge  # starts API + GUI on http://127.0.0.1:8000")
+    print("    python -m shesha.librarian gui     # opens GUI in browser")
     print("Local outputs:")
     print(f"  manifest: {manifest_path}")
     print(f"  readme:   {readme_path}")
@@ -743,18 +742,7 @@ def _build_parser() -> argparse.ArgumentParser:
     gui = sub.add_parser(
         "gui",
         help="Launch the Shesha GUI in your browser",
-    )
-    gui.add_argument(
-        "--gui-port",
-        type=int,
-        default=None,
-        help="GUI port (overrides LIBRARIAN_GUI_PORT). Required unless LIBRARIAN_GUI_PORT is set.",
-    )
-    gui.add_argument(
-        "--port",
-        type=int,
-        default=8000,
-        help="Bridge port (default: 8000)",
+        description="Open the GUI served by the Bridge on port 8000",
     )
 
     return parser
@@ -773,44 +761,45 @@ def command_gui(args: argparse.Namespace) -> None:
     import webbrowser
     import urllib.request
     import urllib.error
+    import time
 
     key = get_or_create_bridge_secret()
-    gui_port_raw = (
-        args.gui_port
-        if getattr(args, "gui_port", None) is not None
-        else os.environ.get("LIBRARIAN_GUI_PORT")
-    )
+    bridge_port = 8000
+    max_wait_seconds = 10
+    start_time = time.time()
 
-    def _looks_like_gui(port: int) -> bool:
+    # Check if Bridge is running on port 8000 (with retry for startup)
+    while True:
         try:
             req = urllib.request.Request(
-                f"http://127.0.0.1:{port}/",
+                f"http://127.0.0.1:{bridge_port}/api/health",
                 headers={"User-Agent": "librarian/cli"},
                 method="GET",
             )
-            with urllib.request.urlopen(req, timeout=0.35) as resp:
-                body = resp.read(4096).decode("utf-8", errors="replace")
-            return "<title>Shesha RLM Operator</title>" in body
-        except (urllib.error.URLError, TimeoutError, ValueError):
-            return False
+            with urllib.request.urlopen(req, timeout=1) as resp:
+                if resp.status not in (200, 403):
+                    raise urllib.error.URLError("Bridge not responding")
+            break  # Success - Bridge is running
+        except urllib.error.HTTPError as e:
+            # 403 Forbidden is expected without auth - Bridge is running
+            if e.code == 403:
+                break  # Success
+            # Other HTTP errors mean Bridge isn't ready yet
+            if time.time() - start_time >= max_wait_seconds:
+                print("Error: Bridge is not running.", file=sys.stderr)
+                print("\nTo use the GUI, start the Bridge first:", file=sys.stderr)
+                print("  librarian bridge", file=sys.stderr)
+                raise SystemExit(2)
+            time.sleep(0.5)
+        except (urllib.error.URLError, TimeoutError):
+            if time.time() - start_time >= max_wait_seconds:
+                print("Error: Bridge is not running.", file=sys.stderr)
+                print("\nTo use the GUI, start the Bridge first:", file=sys.stderr)
+                print("  librarian bridge", file=sys.stderr)
+                raise SystemExit(2)
+            time.sleep(0.5)
 
-    if gui_port_raw:
-        gui_port = int(gui_port_raw)
-    else:
-        # Auto-detect a running GUI dev server to avoid forcing a port setting.
-        candidates = [5173, 5174, 5175, 3000, 4173]
-        gui_port = next((p for p in candidates if _looks_like_gui(p)), None)
-        if gui_port is None:
-            print("GUI dev server not detected.", file=sys.stderr)
-            print("Start it, then re-run this command:", file=sys.stderr)
-            print("  cd gui && npm run dev", file=sys.stderr)
-            print("If your port is not auto-detected, set it explicitly:", file=sys.stderr)
-            print("  LIBRARIAN_GUI_PORT=<port> librarian gui", file=sys.stderr)
-            print("or:", file=sys.stderr)
-            print("  librarian gui --gui-port <port>", file=sys.stderr)
-            raise SystemExit(2)
-
-    url = f"http://localhost:{gui_port}/?key={key}"
+    url = f"http://localhost:{bridge_port}/?key={key}"
 
     print(f"🚀 Launching GUI: {url}")
     print("If browser doesn't open, copy and paste the URL above.")

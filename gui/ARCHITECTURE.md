@@ -17,14 +17,23 @@
 ### 1. Unified Routing (`App.tsx`)
 The application uses a state-driven screen switcher (`currentScreen`). This allows for rapid refinement of "Reframed" versions (Standard vs. Debug vs. Operator) without complex routing overhead.
 
-### 2. Prototype Strategy
-Many screens (e.g., `OperatorChat`, `AgentCenter`) are high-fidelity prototypes that use hardcoded data to demonstrate intended behavior. 
-- **Live Data Path**: Intended to be wired via an optional Local Backend Bridge (see `Wishlist.md`).
-- **Static Scaffolding**: All screens must remain functional as static assets even without the backend.
+### 2. Production Serving Mechanics
+The GUI is served by the Python Bridge server using standard static file serving logic:
+- **Build Output**: Vite bundles all assets into `gui/dist/`.
+- **Bridge Endpoint**: The Python server maps `gui/dist` to the root route `/`.
+- **Single Port**: Both API (`/api/*`) and GUI assets are served on port `8000`.
 
-### 3. Error Handling & Resilience
-- **Error Boundaries**: Wrapped around the main screen renderer in `App.tsx` (implemented in `Shared.tsx`).
-- **FileReader Guards**: `Documentation.tsx` includes explicit error catching for local file uploads.
+### 3. Asset Self-Hosting & Offline Integrity
+To ensure production stability and zero external runtime dependencies:
+- **Fonts**: Inter, JetBrains Mono, and Space Grotesk are bundled locally in `gui/public/fonts/`.
+- **Tailwind**: Compiled locally into a single CSS file via PostCSS.
+- **Strict CSP**: The server enforces a Content Security Policy that restricts all resources to `'self'`.
+- **Offline-First**: The application functions 100% offline (excluding optional external avatar APIs).
+
+### 4. Prototypes & Wiring
+Screens are progressively wired to real Bridge endpoints.
+- **Wired**: Dashboard (Health), Message Monitor (Event Stream), Persistence (Manifest).
+- **Static Scaffolding**: Some secondary screens (e.g., Prompt Builder) remain as interactive high-fidelity prototypes.
 
 ## Developer Workflow
 - **Build**: `npm run build` (Gated by tests)

@@ -79,6 +79,13 @@ User Query → RLM Core Loop → Docker Sandbox
 - **Hot Container Pool**: Maintains 3 warm containers to eliminate startup overhead during the core loop.
 - **Project-Based Organization**: Documents are grouped into named projects for logical separation.
 - **Graceful Docker Degradation**: Shesha initializes successfully even if Docker is unavailable. Query functionality is disabled until Docker is present, with clear error messages guiding users.
+- **Unified GUI Stack**: The Bridge server serves the production GUI directly from `gui/dist`. This eliminates the need for separate dev servers and simplifies deployment for operators.
+- **Production-Ready GUI Mechanics**: The GUI is a fully bundled React application with zero external runtime dependencies.
+  - **Local Tailwind**: CSS is compiled locally using Tailwind v3 and PostCSS.
+  - **Self-Hosted Assets**: Critical assets like Inter, JetBrains Mono, and Space Grotesk fonts are bundled locally.
+  - **Zero CDN**: No reliance on external CDNs (React, Lucide, Tailwind, or Google Fonts) at runtime.
+  - **Offline-First**: Designed to function 100% offline (excluding external avatar APIs).
+  - **Smart Launcher**: The `librarian gui` command includes a 10s retry logic to wait for the Bridge to initialize, providing a seamless "one-click" experience.
 
 ### System Requirements & Installation
 **Design Philosophy**: Infrastructure dependencies should be detected and validated before installation proceeds.

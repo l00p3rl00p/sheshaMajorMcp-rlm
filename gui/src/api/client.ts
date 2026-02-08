@@ -53,7 +53,7 @@ export interface BridgeEvent {
 
 type BridgeEventListener = (event: BridgeEvent) => void;
 
-const BASE_URL = 'http://127.0.0.1:8000/api';
+const BASE_URL = window.location.port === '8000' ? '/api' : 'http://127.0.0.1:8000/api';
 
 export class BridgeClient {
     private static listeners: BridgeEventListener[] = [];

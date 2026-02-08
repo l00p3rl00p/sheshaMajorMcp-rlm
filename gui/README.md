@@ -7,13 +7,25 @@ This folder contains a browser-based operator GUI that layers over the Shesha Li
 - Lowest friction for operators.
 - Works alongside the existing CLI/MCP workflows.
 
-## Run Locally
+## Run Locally (Production)
+The GUI is built into production assets and served directly by the Shesha Bridge on port 8000.
+
+1. Start the Bridge:
+   `librarian bridge`
+2. Launch the GUI:
+   `librarian gui`
+
+## Development Workflow
+If you want to modify the GUI code and see changes in real-time:
+
 Prerequisites: Node.js (LTS).
 
 1. Install dependencies:
    `npm install`
-2. Start the dev server:
+2. Start the Vite dev server:
    `npm run dev`
+3. Build for production:
+   `npm run build` (Assets are output to `dist/` and served by the Bridge).
 
 ## Testing
 The GUI includes a comprehensive test suite using Vitest and React Testing Library.
@@ -22,7 +34,7 @@ The GUI includes a comprehensive test suite using Vitest and React Testing Libra
 - Run tests in CI mode (single run): `npm run test:ci`
 - Note: GUI builds are gated by tests (`npm run build` executes `test:ci` first).
 
-The GUI is static scaffolding. It references real CLI/MCP commands but does not execute them directly.
+The GUI is fully wired to the local Bridge API.
 
 ## Canonical CLI Commands
 Use the CLI for actual operations:

@@ -2,8 +2,12 @@
 
 All notable changes to the Shesha RLM Operator GUI will be documented in this file.
 
-## [Unreleased]
+## [0.5.0] - 2026-02-07
 ### Improvements (#)
+- **Production-Ready Bundling**: Switched from CDNs to local assets (JS, CSS, Fonts).
+- **Self-Hosted Assets**: Integrated local Inter, JetBrains Mono, and Space Grotesk fonts.
+- **Zero-Dependency Runtime**: Removed dependency on external CDNs for Tailwind, React, and Lucide.
+- **Bridge Integration**: Standardized on Bridge-hosted serving at port 8000.
 - Added comprehensive automated test suite using Vitest/RTL.
 - Integrated GUI testing into project-wide `Makefile`.
 - Established standard documentation hierarchy (ARCHITECTURE, USER_OUTCOMES, CHANGELOG).
