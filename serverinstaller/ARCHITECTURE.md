@@ -21,11 +21,11 @@ The Shesha Clean Room Installer is designed to be a self-contained, copy-pasteab
 - Compares post-install state with the pre-install audit.
 - Generates the "Before and After" verification report.
 
-### 4. `uninstall.py` (Cleanup)
-- Reads the artifacts tracked in `manifest.json`.
-- Safely removes files, directories, and configuration changes.
+### 3. State Management (`manifest.json`)
+- **Registry**: Every file or directory created is logged in `.librarian/manifest.json`.
+- **Integrity**: Used by `uninstall.py` to ensure zero file-leak cleanup.
 
-## Portability Design
+## Constraints & Security
 
 - **Relative Root**: The installer assumes the project root is at `../`.
 - **Zero-Dependency Bootstrap**: The core scripts use standard library modules where possible (e.g., `subprocess`, `pathlib`, `json`).

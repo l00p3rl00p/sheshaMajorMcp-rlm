@@ -1,13 +1,19 @@
 # Shesha Clean Room Installer
 
-This is the portable, copy-pasteable installer for Shesha RLM. It is designed to bridge the gap between human operators and automated agents by providing a reliable, isolated installation process in any environment.
+The portable wavefront for Shesha RLM. This directory provides a "Just Works" installation experience for human operators and automated agents, ensuring a clean and isolated environment across any repository fork.
 
-## 🚀 Quick Start (Headless)
+## 🚀 Quick Start (60s)
 
-For agents and CI/CD:
+To install Shesha headlessly (for agents/CI):
 
 ```bash
 python serverinstaller/install.py --headless
+```
+
+To install interactively (with guided walkthrough):
+
+```bash
+python serverinstaller/install.py
 ```
 
 ## 🛠 Features
