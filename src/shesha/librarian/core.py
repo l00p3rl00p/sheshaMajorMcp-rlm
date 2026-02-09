@@ -138,11 +138,18 @@ class LibrarianCore:
             )
             return self._shesha
 
-    def query(self, project_id: str, question: str) -> str:
+    def query(self, project_id: str, question: str, *, include_trace: bool = False) -> dict[str, Any]:
         project_id = validate_project_id(project_id)
         question = validate_question(question)
 
         shesha = self._get_shesha()
         project = shesha.get_project(project_id)
         result = project.query(question)
-        return result.answer
+        
+        response = {"answer": result.answer}
+        if include_trace:
+            # result type is assumed to have a trace attribute or thought blocks
+            # We convert to a serializable format
+            response["trace"] = list(result.trace) if hasattr(result, "trace") else []
+            
+        return response

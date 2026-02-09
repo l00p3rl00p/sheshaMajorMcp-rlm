@@ -664,6 +664,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     query.add_argument("--model", type=str, default=None, help="Override SHESHA_MODEL")
     query.add_argument("--api-key", type=str, default=None, help="Override SHESHA_API_KEY")
+    query.add_argument("--trace", action="store_true", help="Include execution trace/thought blocks")
+    query.add_argument("--json", action="store_true", help="Output machine-readable JSON")
 
     projects = sub.add_parser("projects", help="Manage projects")
     proj_sub = projects.add_subparsers(dest="projects_cmd", required=True)
@@ -873,11 +875,23 @@ def main(argv: list[str] | None = None) -> int:
         storage_path = args.storage_path if args.storage_path is not None else resolved.storage
         core = LibrarianCore(storage_path=storage_path, model=args.model, api_key=args.api_key)
         try:
-            answer = core.query(args.project, args.question)
+            response = core.query(args.project, args.question, include_trace=args.trace)
         except (RuntimeError, SheshaError, ValidationError, ValueError) as e:
-            print(str(e), file=sys.stderr)
+            if args.json:
+                print(json.dumps({"error": str(e)}), file=sys.stderr)
+            else:
+                print(str(e), file=sys.stderr)
             return 2
-        print(answer)
+            
+        if args.json:
+            print(json.dumps(response, indent=2))
+        else:
+            if args.trace and "trace" in response:
+                for idx, step in enumerate(response["trace"]):
+                    print(f"\n[Step {idx+1}]")
+                    print(step)
+                print("\n--- Final Answer ---")
+            print(response["answer"])
         return 0
 
     if cmd == "projects":
