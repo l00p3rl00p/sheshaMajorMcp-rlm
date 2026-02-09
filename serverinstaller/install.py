@@ -105,6 +105,46 @@ class SheshaInstaller:
         
         self.log(f"Installation manifest written to {manifest_path}")
 
+    def setup_path(self, audit: Dict[str, Any]):
+        """Offer to add Shesha to PATH with markers for surgical reversal."""
+        if self.args.headless:
+            return
+
+        shell = audit.get("shell", "")
+        rc_file = None
+        if "zsh" in shell:
+            rc_file = Path.home() / ".zshrc"
+        elif "bash" in shell:
+            rc_file = Path.home() / ".bashrc"
+
+        if not rc_file or not rc_file.exists():
+            return
+
+        venv_bin = self.project_root / ".venv" / "bin"
+        if sys.platform.startswith("win"):
+            venv_bin = self.project_root / ".venv" / "Scripts"
+        
+        export_line = f'export PATH="{venv_bin.resolve()}:$PATH"'
+        
+        self.log(f"\nOptional: add Shesha to PATH so 'librarian' is available everywhere.")
+        self.log(f"  This will modify: {rc_file}")
+        self.log(f"  (Markers # Shesha Block START/END will be used for safe reversal)")
+        
+        choice = input("Add to PATH? [y/N]: ").strip().lower()
+        if choice != "y":
+            return
+
+        marker_start = "# Shesha Block START"
+        marker_end = "# Shesha Block END"
+        
+        block = f"\n{marker_start}\n{export_line}\n{marker_end}\n"
+        
+        with rc_file.open("a", encoding="utf-8") as handle:
+            handle.write(block)
+        
+        self.artifacts.append(str(rc_file)) # Track that we modified this file
+        self.log(f"Added to PATH in {rc_file}")
+
     def run(self):
         if not self.args.headless and not sys.stdin.isatty():
             self.error("Interactive mode requires a TTY. Use --headless for automated install.")
@@ -116,7 +156,10 @@ class SheshaInstaller:
         self.install_python_deps(discovery)
         self.setup_npm(discovery)
         
-        self.write_manifest(asdict(audit) if hasattr(audit, '__dict__') else audit)
+        audit_dict = asdict(audit) if hasattr(audit, '__dict__') else audit
+        self.setup_path(audit_dict)
+        
+        self.write_manifest(audit_dict)
         self.log("Installation complete.")
 
 def main():

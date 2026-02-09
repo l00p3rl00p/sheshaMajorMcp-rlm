@@ -25,16 +25,50 @@ class SheshaUninstaller:
         artifacts = manifest.get("install_artifacts", [])
         self.log(f"Found {len(artifacts)} tracked artifacts for removal.")
 
-        # 1. Remove tracked artifacts (files/dirs)
+        # 1. Remove tracked artifacts (files/dirs or surgical blocks)
+        marker_start = "# Shesha Block START"
+        marker_end = "# Shesha Block END"
+
         for path_str in artifacts:
             path = Path(path_str)
-            if path.exists():
-                if path.is_dir():
-                    self.log(f"Removing directory: {path}")
-                    shutil.rmtree(path, ignore_errors=True)
-                else:
-                    self.log(f"Removing file: {path}")
-                    path.unlink(missing_ok=True)
+            if not path.exists():
+                continue
+
+            # Check for surgical markers in ANY file
+            is_surgical = False
+            if path.is_file():
+                try:
+                    content = path.read_text(encoding="utf-8")
+                    if marker_start in content:
+                        is_surgical = True
+                except Exception:
+                    pass
+
+            if is_surgical:
+                self.log(f"Surgically reversing environment changes in: {path}")
+                lines = path.read_text(encoding="utf-8").splitlines()
+                new_lines = []
+                inside_block = False
+                for line in lines:
+                    if line.strip() == marker_start:
+                        inside_block = True
+                        continue
+                    if line.strip() == marker_end:
+                        inside_block = False
+                        continue
+                    if not inside_block:
+                        new_lines.append(line)
+                
+                path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+                continue
+
+            # Standard removal for directories/files
+            if path.is_dir():
+                self.log(f"Removing directory: {path}")
+                shutil.rmtree(path, ignore_errors=True)
+            else:
+                self.log(f"Removing file: {path}")
+                path.unlink(missing_ok=True)
 
         # 2. Cleanup manifest directory
         manifest_dir = self.manifest_path.parent
