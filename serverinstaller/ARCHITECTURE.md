@@ -1,32 +1,51 @@
 # Architecture: Portable Clean Room Installer
 
-The Shesha Clean Room Installer is designed to be a self-contained, copy-pasteable directory that can bootstrap Shesha in any repository fork.
+Technical Truth and Developer Workflow for the Shesha Clean Room Installer.
 
-## Modular Components
+## Tactile Workflow
 
-### 1. `audit.py` (Registry & Probe)
-- Responsible for non-destructive system probing.
-- Returns a structured `AuditResult` object.
-- Functions as the "eyes" of the installer.
+### Installation (Guided)
+```bash
+python serverinstaller/install.py
+```
+*Triggers interactive inventory probes, offers elective component selection, and PATH setup.*
 
-### 2. `install.py` (Orchestrator)
-- Uses `audit.py` to decide the best installation path.
-- Handles:
-    - Virtual environment creation/verification.
-    - Python dependency installation (pip).
-    - NPM policy enforcement (local vs global).
-    - State persistence (`manifest.json`).
+### Installation (Headless)
+```bash
+python serverinstaller/install.py --headless --no-gui
+```
+*Zero-touch replication. Optionally skip GUI using `--no-gui` for minimalist CLI-only nodes.*
 
-### 3. `verify.py` (Reporter)
-- Compares post-install state with the pre-install audit.
-- Generates the "Before and After" verification report.
+### Verification
+```bash
+python serverinstaller/verify.py
+```
+*Generates Before/After transformation report based on audit snapshot.*
+
+### Cleanup/Uninstall
+```bash
+python serverinstaller/uninstall.py --kill-venv
+```
+*Marker-aware surgical reversal and artifact removal.*
+
+## Logic Model & Subsystems
+
+### 1. Probe Layer (`audit.py`)
+- **System Sniffing**: Non-destructive detection of Shell, Node, NPM, Docker, and Python environments.
+- **Portability Hardening**: Logic is designed to run on Python 3.9+ to ensure the installer works on older systems, even if the primary application requires 3.11+.
+
+### 2. Execution Layer (`install.py`)
+- **Discovery**: Scans parent directory (`../`) for specific indicators (`pyproject.toml`, `package.json`).
+- **Inventory Awareness**: Presents a list of discovered components. In guided mode, the user can selectively toggle installation.
+- **Enforcement**: Bootstraps the `.venv` and installs dependencies based on selection.
+- **Instrumentation**: Wraps shell PATH updates in `# Shesha Block` markers for guaranteed safe reversal.
 
 ### 3. State Management (`manifest.json`)
-- **Registry**: Every file or directory created is logged in `.librarian/manifest.json`.
-- **Integrity**: Used by `uninstall.py` to ensure zero file-leak cleanup.
+- **Registry**: Logs every file, directory, or shell configuration change.
+- **Integrity**: Essential for `uninstall.py` to achieve zero file-leak cleanup.
 
 ## Constraints & Security
 
-- **Relative Root**: The installer assumes the project root is at `../`.
-- **Zero-Dependency Bootstrap**: The core scripts use standard library modules where possible (e.g., `subprocess`, `pathlib`, `json`).
-- **Idempotency**: All operations are designed to be safe to run multiple times.
+- **Local-Only**: Bootstraps from the local repository state only. No remote template fetching.
+- **Permissions**: Guided mode explicitly asks for permission before modifying any host RC files.
+- **Self-Documenting**: Failures in subprocesses (like `pip`) are captured and logged as warnings rather than hard crashes, ensuring the installer completes its audit output.

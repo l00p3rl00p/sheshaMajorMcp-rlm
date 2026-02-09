@@ -8,6 +8,7 @@ To provide a "Just Works" installation experience that creates a zero-leak, isol
 ## Successful Outcomes
 
 - **Portability**: The `/serverinstaller` directory can be copied to any fork/repo and execute correctly without external dependencies. The installer is a standalone wavefront. It does not carry opaque binaries; it bootstraps from the host's existing tools and the local workspace.
+- **Inventory Awareness**: The installer identifies all available components (Server, GUI, Docker) and allows the user to selectively install only what they need, preventing "package bloat" on minimalist deployments.
 - **Local Source Parity**: The installer installs the application *exactly as it exists* in the local root directory, respecting all custom modifications. 
 - **Zero-Touch Replication**: A real agent can execute `install.py --headless` and achieve a functional stack without human intervention.
 - **Surgical Integrity**: The `uninstall` command is not a hammer. It surgically reverses only the changes it made, ensuring the host system is returned to its exact pre-installation state.

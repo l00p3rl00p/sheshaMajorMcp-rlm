@@ -1,30 +1,34 @@
 # Environment: Clean Room Setup
 
-This document outlines the environment audit logic and configuration requirements for the Shesha Clean Room Installer.
+Technical environment requirements and audit logic for the Shesha Clean Room Installer.
+
+## Core Dependency Rules
+
+### 1. Python Compatibility
+- **Installer Wavefront**: The installer scripts (`install.py`, `audit.py`, etc.) are hardened for **Python 3.9+**. This ensures that the bootstrap process itself is robust across legacy environments.
+- **Application Engine**: The core Shesha RLM / MCP stack typically requires **Python 3.11+**. The installer checks this during the audit and will issue a warning if the host environment is too old for the engine.
+
+### 2. Node.js & NPM
+- **Requirement**: Only required if installing the `GUI Frontend`.
+- **Policy**: Supports `--npm-policy local` (isolated) or `global` (host).
+
+### 3. Docker
+- **Requirement**: Required for RLM sandbox features and Dockerized query tracing.
+- **Access**: The installer verifies `docker info` to ensure the daemon is accessible.
 
 ## Environment Audit Logic
 
-The installer performs a deep scan of the host environment before taking any action.
-
-### 1. PATH Analysis
-- Scans `os.environ['PATH']` for conflicting Node versions or Docker binaries.
-- Checks for `.venv/bin` (or equivalent) to determine if we are already in an isolated Python environment.
-
-### 2. Shell Detection
-- Identifies the active shell (`zsh`, `bash`, `cmd`, `powershell`).
-- Locates relevant configuration files (`.zshrc`, `.bashrc`, etc.) for persistence.
-
-### 3. Dependency Check
-- **Node/NPM**: Verifies if `npm` is available globally and checks its version.
-- **Docker**: Verifies the Docker socket is accessible.
+### Pre-flight Probe
+1.  **Shell Detection**: Captures active shell type and RC paths (`.zshrc`, `.bashrc`).
+2.  **Binary Discovery**: Locates `npm`, `node`, `docker`, and `pip`.
+3.  **Component Inventory**: Scans the root workspace to identify available installation targets.
 
 ## Configuration Policies
 
-### NPM Policy (`--npm-policy`)
-- `local`: Installs a private `node`/`npm` binary into the virtual environment. Recommended for total isolation.
-- `global`: Uses the existing system `npm`.
-- `auto`: Scans for global first, and if not present or version-mismatched, recommends `local`.
+### NPM Isolation (`--npm-policy`)
+- `local`: Installs private binaries. Recommended for production wavefronts to prevent environment leak.
+- `global`: Uses system `npm`.
 
-### Docker Policy (`--docker-policy`)
-- `fail`: Exits if Docker is not detected.
-- `skip`: Proceeds with installation but disables RLM query features.
+### Docker Enforcement (`--docker-policy`)
+- `fail`: Hard abort if Docker is inaccessible.
+- `skip`: Proceed but disable sandbox-dependent features.

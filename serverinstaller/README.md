@@ -4,38 +4,38 @@ The portable wavefront for Shesha RLM. This directory provides a "Just Works" in
 
 ## 🚀 Quick Start (60s)
 
-To install Shesha headlessly (for agents/CI):
-
+To install headlessly (for agents/CI):
 ```bash
 python serverinstaller/install.py --headless
 ```
 
-To install interactively (with guided walkthrough):
-
+To install selectively (guided inventory):
 ```bash
 python serverinstaller/install.py
 ```
 
 ## 🛠 Features
 
-- **Portability**: Copy this folder to any fork/repo. It assumes the project is at `../`.
-- **Environment Audit**: Pre-flight scan of PATH, Node, and Docker.
-- **Node Isolation**: Optional local Node/NPM installation for a self-contained environment.
-- **Before/After Verification**: Transparency through state change reporting.
-- **Clean Uninstall**: Complete reversal of all installation artifacts.
+- **Portability**: Standalone directory. Bootstraps from host tools and local workspace.
+- **Inventory Awareness**: Scans for Python, Node, and Docker; offers selective installation.
+- **Surgical Reversal**: Clean uninstall including marker-aware shell configuration cleanup.
+- **Wide compatibility**: Logic hardened for Python 3.9+ environments.
 
 ## 📖 Documentation
 
-- [USER_OUTCOMES.md](./USER_OUTCOMES.md): Goals and success criteria.
-- [ENVIRONMENT.md](./ENVIRONMENT.md): Deep dive into audit logic and policies.
-- [ARCHITECTURE.md](./ARCHITECTURE.md): Design of the modular installer.
+- [USER_OUTCOMES.md](./USER_OUTCOMES.md): Why we built this and how we measure success.
+- [ARCHITECTURE.md](./ARCHITECTURE.md): Technical logic, modular scripts, and developer workflow.
+- [ENVIRONMENT.md](./ENVIRONMENT.md): Environment requirements, audit logic, and policies.
+- [CHANGELOG.md](./CHANGELOG.md): History of improvements and fixes.
 
-## ⚙️ Arguments
+## ⚙️ Key Arguments
 
 | Flag | Description |
 |---|---|
-| `--headless` | Bypass all interactive prompts. |
+| `--headless` | Bypass all interactive prompts (agent mode). |
+| `--no-gui` | Skip GUI/NPM installation phase. |
 | `--npm-policy {local,global,auto}` | Control Node/NPM isolation. |
-| `--docker-policy {fail,skip}` | Define behavior if Docker is missing. |
-| `--storage-path PATH` | Override default storage location. |
-| `--log-dir PATH` | Override default log location. |
+| `--docker-policy {skip,fail}` | Define behavior if Docker is missing. |
+
+---
+**Status**: Production-ready for agent-driven replication.

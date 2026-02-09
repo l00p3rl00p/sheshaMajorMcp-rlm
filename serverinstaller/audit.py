@@ -27,7 +27,7 @@ class EnvironmentAuditor:
         self.root_dir = root_dir
 
     def audit(self) -> AuditResult:
-        from datetime import datetime, UTC
+        from datetime import datetime, timezone
         
         # 1. Shell detection
         shell = os.environ.get('SHELL', 'unknown')
@@ -62,7 +62,7 @@ class EnvironmentAuditor:
         env_snapshot = {v: os.environ.get(v, '') for v in interesting_vars if v in os.environ}
 
         return AuditResult(
-            timestamp=datetime.now(UTC).isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             shell=shell,
             python_version=python_version,
             in_venv=in_venv,

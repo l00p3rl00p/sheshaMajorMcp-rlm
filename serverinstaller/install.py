@@ -62,13 +62,14 @@ class SheshaInstaller:
     def install_python_deps(self, discovery: Dict[str, Any]):
         if discovery["python_project"]:
             self.log("Installing Python dependencies (local source)...")
-            # We install in editable mode to respect the "Install-as-is" requirement
             cmd = [sys.executable, "-m", "pip", "install", "-e", "."]
             if discovery["npm_project"]:
-                # If there's a dev flag or similar, we use it
                 cmd = [sys.executable, "-m", "pip", "install", "-e", ".[dev]"]
-            
-            subprocess.run(cmd, cwd=self.project_root, check=True)
+            try:
+                subprocess.run(cmd, cwd=self.project_root, check=True, capture_output=True, text=True)
+            except subprocess.CalledProcessError as e:
+                self.log(f"Warning: pip install failed. This is expected if external dependencies are missing or Python version is incompatible.")
+                self.log(f"Error: {e.stderr}")
 
     def setup_npm(self, discovery: Dict[str, Any]):
         if not discovery["gui_project"]:
@@ -150,14 +151,47 @@ class SheshaInstaller:
             self.error("Interactive mode requires a TTY. Use --headless for automated install.")
 
         audit = self.auditor.audit()
-        discovery = self.discover_project()
+        
+        # Hard requirement check
+        py_major, py_minor = map(int, audit.python_version.split('.'))
+        if (py_major, py_minor) < (3, 11):
+            self.log(f"WARNING: Python {audit.python_version} detected. Most Shesha/MCP projects require 3.11+.")
+            if self.args.docker_policy == "fail":
+                self.error("Python version incompatible.")
 
-        self.setup_venv()
-        self.install_python_deps(discovery)
-        self.setup_npm(discovery)
+        discovery = self.discover_project()
+        
+        # Component Selection
+        install_choices = {
+            "python": discovery["python_project"],
+            "gui": discovery["gui_project"] and not self.args.no_gui,
+        }
+        
+        if not self.args.headless:
+            print("\n" + "="*40)
+            print("COMPONENT INVENTORY".center(40))
+            print("="*40)
+            
+            if discovery["python_project"]:
+                choice = input("Install Python Server/CLI? [Y/n]: ").strip().lower()
+                install_choices["python"] = choice != 'n'
+            
+            if discovery["gui_project"]:
+                choice = input("Install GUI Frontend? [Y/n]: ").strip().lower()
+                install_choices["gui"] = choice != 'n'
+            
+            print("="*40 + "\n")
+
+        if install_choices["python"]:
+            self.setup_venv()
+            self.install_python_deps(discovery)
+        
+        if install_choices["gui"]:
+            self.setup_npm(discovery)
         
         audit_dict = asdict(audit) if hasattr(audit, '__dict__') else audit
-        self.setup_path(audit_dict)
+        if install_choices["python"]:
+            self.setup_path(audit_dict)
         
         self.write_manifest(audit_dict)
         self.log("Installation complete.")
@@ -165,6 +199,7 @@ class SheshaInstaller:
 def main():
     parser = argparse.ArgumentParser(description="Shesha Clean Room Installer")
     parser.add_argument("--headless", action="store_true", help="Non-interactive install")
+    parser.add_argument("--no-gui", action="store_true", help="Skip GUI installation")
     parser.add_argument("--npm-policy", choices=["local", "global", "auto"], default="auto")
     parser.add_argument("--docker-policy", choices=["fail", "skip"], default="skip")
     parser.add_argument("--storage-path", type=Path)
