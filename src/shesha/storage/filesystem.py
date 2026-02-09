@@ -27,7 +27,7 @@ class FilesystemStorage:
         """Get the path for a project directory."""
         return safe_path(self.projects_dir, project_id)
 
-    def create_project(self, project_id: str) -> None:
+    def create_project(self, project_id: str, mount_path: Path | None = None) -> None:
         """Create a new project."""
         project_path = self._project_path(project_id)
         if project_path.exists():
@@ -37,7 +37,11 @@ class FilesystemStorage:
         if self.keep_raw_files:
             (project_path / "raw").mkdir()
         # Write project metadata
-        meta = {"id": project_id, "created": True}
+        meta = {
+            "id": project_id,
+            "created": True,
+            "mount_path": str(mount_path) if mount_path else None
+        }
         (project_path / "_meta.json").write_text(json.dumps(meta))
 
     def delete_project(self, project_id: str) -> None:
@@ -60,6 +64,13 @@ class FilesystemStorage:
         """Check if a project exists."""
         project_path = self._project_path(project_id)
         return project_path.exists() and (project_path / "_meta.json").exists()
+
+    def get_project_metadata(self, project_id: str) -> dict:
+        """Get metadata for a project."""
+        if not self.project_exists(project_id):
+            raise ProjectNotFoundError(project_id)
+        meta_path = self._project_path(project_id) / "_meta.json"
+        return json.loads(meta_path.read_text())
 
     def store_document(
         self, project_id: str, doc: ParsedDocument, raw_path: Path | None = None

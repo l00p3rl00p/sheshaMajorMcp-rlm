@@ -1,0 +1,5 @@
+{
+  "name": "Shesha RLM Operator",
+  "description": "Optional browser-based operator GUI for Shesha Librarian (CLI + MCP) providing state visibility, capability discovery, and agentic control.",
+  "requestFramePermissions": []
+}

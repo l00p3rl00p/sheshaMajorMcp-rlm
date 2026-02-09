@@ -12,6 +12,11 @@ from pathlib import Path
 class LibrarianPaths:
     """Resolved state paths for Librarian."""
 
+    @property
+    def secret(self) -> Path:
+        """User secret for bridge authentication."""
+        return self.home / "secret.json"
+
     home: Path
     storage: Path
     logs: Path
@@ -52,4 +57,3 @@ def resolve_paths() -> LibrarianPaths:
     logs_dir = Path(logs_env).expanduser() if logs_env else (home_dir / "logs")
 
     return LibrarianPaths(home=home_dir, storage=storage_dir, logs=logs_dir)
-

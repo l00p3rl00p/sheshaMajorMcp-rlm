@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import subprocess
 import sys
 import sysconfig
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -17,12 +18,12 @@ from docker.errors import DockerException, ImageNotFound
 
 from shesha import __version__
 from shesha.exceptions import SheshaError
-from shesha.librarian.core import LibrarianCore, ValidationError
+from shesha.librarian.core import LibrarianCore, ValidationError, get_or_create_bridge_secret
+from shesha.librarian.config import set_manifest_dir
 from shesha.librarian.manifest import LibrarianManifest, SelfTestStatus
 from shesha.librarian.mcp_jsonrpc import encode_message, parse_messages
 from shesha.librarian.paths import LibrarianPaths, resolve_paths
 from shesha.sandbox.executor import ContainerExecutor
-
 
 SUPPORTED_MODES = ["cli", "mcp"]
 SUPPORTED_ENV_VARS = [
@@ -41,7 +42,7 @@ class InstallResult:
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def _default_manifest_dir() -> Path:
@@ -111,8 +112,8 @@ def _sandbox_source_dir() -> Path | None:
 
 def _ensure_sandbox_image(image: str) -> tuple[bool, str]:
     """Ensure the sandbox Docker image exists, building it if missing.
-    
-    Uses try/finally to guarantee Docker client cleanup.
+
+    Uses context manager to guarantee Docker client cleanup.
     """
     client = None
     try:
@@ -138,45 +139,17 @@ def _ensure_sandbox_image(image: str) -> tuple[bool, str]:
     except DockerException as e:
         return False, f"Docker unavailable: {e}"
     finally:
-        if client:
+        if client is not None:
             client.close()
 
 
 def _write_readme(*, path: Path, storage_path: Path, logs_path: Path, manifest_path: Path) -> None:
-    # Tailor the command to the current environment
-    python_path = sys.executable or "python"
-
     content = f"""# Librarian MCP Server (Shesha RLM)
 
 This installation provides:
 
 - **CLI mode (headless):** run queries and manage projects from a terminal
 - **MCP mode (stdio):** run as a Model Context Protocol server over stdin/stdout
-
-## 🔌 MCP Client Configuration
-
-To connect Shesha to an MCP client (like Claude Desktop or Cursor), add the following to your configuration:
-
-```json
-{{
-  "mcpServers": {{
-    "shesha": {{
-      "command": "{python_path}",
-      "args": [
-        "-m",
-        "shesha.librarian",
-        "mcp"
-      ],
-      "env": {{
-        "ANTHROPIC_API_KEY": "YOUR_API_KEY_HERE",
-        "SHESHA_MODEL": "claude-3-5-sonnet-20241022"
-      }}
-    }}
-  }}
-}}
-```
-
-**Note:** Replace `YOUR_API_KEY_HERE` with your actual API key. For a list of supported models and provider examples, see [**docs/ENVIRONMENT.md**](./docs/ENVIRONMENT.md).
 
 ## Persistent state + logs
 
@@ -193,7 +166,7 @@ Back up `{storage_path}` to preserve projects/documents.
 
 ## Canonical commands
 
-Run MCP server (stdio) manually:
+Run MCP server (stdio):
 
 ```bash
 python -m shesha.librarian mcp
@@ -244,14 +217,14 @@ def _write_install_artifacts(
 
 def _perform_system_audit() -> tuple[bool, str]:
     """Audit the runtime environment (Python version, venv, dependencies).
-    
+
     Performs critical pre-flight checks before installation:
     1. Python version >= 3.11 (hard requirement)
     2. Virtual environment detection (strong recommendation)
-    
+
     Returns:
         (ok, details): ok=False stops installation; ok=True continues with warning if needed.
-    
+
     Security note: This function only reads system state (sys.version_info, sys.prefix).
     No external input is processed, so there are no injection risks.
     """
@@ -277,7 +250,7 @@ def _perform_system_audit() -> tuple[bool, str]:
         # Success message
         details = f"{env_msg}✓ Python v{major}.{minor} (ok)"
         return True, details
-    
+
     except Exception as e:  # noqa: BLE001 - defensive catch for unexpected system state
         # Fallback: if we can't determine version or venv status, proceed with warning
         # This should never happen but protects against unexpected platform issues
@@ -495,48 +468,19 @@ def run_install(
     print(f"  {mcp_details}")
 
     # 2) Docker/sandbox validation (required for queries).
-    docker_available = False
-    if not skip_docker:
-        print("Self-test: Docker daemon…")
-        from shesha.shesha import Shesha as SheshaClass
+    print("Self-test: Docker daemon…")
+    from shesha.shesha import Shesha as SheshaClass
 
-        if SheshaClass._is_docker_available():
-            docker_available = True
-            print("  docker: ok")
-        else:
-            choice = _prompt_docker_options()
-            if choice == "guide":
-                _show_docker_install_guide()
-                # Re-check after guide
-                if SheshaClass._is_docker_available():
-                    docker_available = True
-                    print("  docker: ok (after install)")
-                else:
-                    print("  docker: still not detected. Proceeding with Docker disabled.")
-            elif choice == "abort":
-                return InstallResult(ok=False, details="Installation aborted by user (Docker missing)")
-            elif choice == "skip":
-                print("  docker: skipped by user")
-            else:
-                # Non-interactive or fallback
-                msg = "Docker is not running. Please start Docker and try again."
-                status = SelfTestStatus(
-                    ok=False,
-                    timestamp=_utc_now_iso(),
-                    details=f"Docker check failed: {msg}",
-                    docker_available=False,
-                )
-                _write_install_artifacts(
-                    manifest_path=manifest_path,
-                    readme_path=readme_path,
-                    storage_path=paths.storage,
-                    logs_path=paths.logs,
-                    self_test=status,
-                    docker_available=False,
-                )
-                return InstallResult(ok=False, details=status.details)
+    if skip_docker:
+        docker_available = False
+        print("  docker: skipped (--skip-docker)")
+    elif SheshaClass._is_docker_available():
+        docker_available = True
+        print("  docker: ok")
     else:
-        print("Self-test: Docker daemon… skipped")
+        docker_available = False
+        msg = "Docker is not running. Start Docker Desktop (or equivalent) before installing."
+        print(f"  {msg}")
 
     if docker_available and not skip_sandbox:
         print("Self-test: sandbox image + ping…")
@@ -566,7 +510,9 @@ def run_install(
     # 3) Write manifest + readme.
     docker_status = "docker: skip" if not docker_available else "docker: ok"
     sandbox_status = "sandbox: skipped" if not docker_available or skip_sandbox else "sandbox: ok"
-    details = "; ".join([system_details.split("\n")[-1], mcp_details, docker_status, sandbox_status])
+    details = "; ".join(
+        [system_details.split("\n")[-1], mcp_details, docker_status, sandbox_status]
+    )
     status = SelfTestStatus(
         ok=True,
         timestamp=_utc_now_iso(),
@@ -607,11 +553,48 @@ def _print_install_summary(*, paths: LibrarianPaths, manifest_dir: Path) -> None
     print("Next steps:")
     print("  MCP (stdio):")
     print("    python -m shesha.librarian mcp")
+    print("    docker must be running before starting MCP query workflows.")
     print("  Headless query:")
     print('    python -m shesha.librarian query --project <project_id> "<question>"\n')
+    print("GUI + Bridge:")
+    print("    python -m shesha.librarian bridge  # starts API + GUI on http://127.0.0.1:8000")
+    print("    python -m shesha.librarian gui     # opens GUI in browser")
     print("Local outputs:")
     print(f"  manifest: {manifest_path}")
     print(f"  readme:   {readme_path}")
+
+
+def _offer_path_setup() -> None:
+    if not sys.stdin.isatty():
+        return
+
+    print("\nOptional: add Librarian venv to PATH so `librarian` is available everywhere.")
+    print("  1) Add to PATH now")
+    print("  2) Skip")
+    choice = input("Choose [1-2]: ").strip()
+    if choice != "1":
+        return
+
+    venv_bin = Path(".venv") / "bin"
+    if sys.platform.startswith("win"):
+        venv_bin = Path(".venv") / "Scripts"
+
+    export_line = f'export PATH="{venv_bin.resolve()}:$PATH"'
+    shell = os.environ.get("SHELL", "")
+    rc_file = None
+    if shell.endswith("zsh"):
+        rc_file = Path.home() / ".zshrc"
+    elif shell.endswith("bash"):
+        rc_file = Path.home() / ".bashrc"
+
+    if rc_file is None:
+        print("Could not detect shell rc file. Add this manually:")
+        print(f"  {export_line}")
+        return
+
+    with rc_file.open("a", encoding="utf-8") as handle:
+        handle.write(f"\n{export_line}\n")
+    print(f"Added to PATH in {rc_file}")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -681,6 +664,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     query.add_argument("--model", type=str, default=None, help="Override SHESHA_MODEL")
     query.add_argument("--api-key", type=str, default=None, help="Override SHESHA_API_KEY")
+    query.add_argument("--trace", action="store_true", help="Include execution trace/thought blocks")
+    query.add_argument("--json", action="store_true", help="Output machine-readable JSON")
 
     projects = sub.add_parser("projects", help="Manage projects")
     proj_sub = projects.add_subparsers(dest="projects_cmd", required=True)
@@ -692,6 +677,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     create = proj_sub.add_parser("create", help="Create a project")
     create.add_argument("project_id")
+    create.add_argument(
+        "--mount-path",
+        type=Path,
+        default=None,
+        help="Local directory to mount/bind to this project",
+    )
     create.add_argument(
         "--storage-path",
         type=Path,
@@ -719,7 +710,102 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Override storage directory",
     )
 
+    # Bridge command
+    bridge = sub.add_parser(
+        "bridge",
+        help="Start local backend bridge for GUI",
+        description="Run local API server bridging CLI to Browser GUI",
+    )
+    bridge.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind (default: 127.0.0.1)",
+    )
+    bridge.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Port to bind (default: 8000)",
+    )
+
+    mount = sub.add_parser("mount", help="Manage directory mounts (alias for projects)")
+    mount_sub = mount.add_subparsers(dest="mount_cmd", required=True)
+    mount_sub.add_parser("list", help="List mounted paths").add_argument(
+        "--storage-path", type=Path, default=None, help="Override storage directory"
+    )
+    mcreate = mount_sub.add_parser("create", help="Mount a local directory")
+    mcreate.add_argument("project_id", help="ID for the new mount")
+    mcreate.add_argument("mount_path", type=Path, help="Local directory to bind")
+    mcreate.add_argument(
+        "--storage-path", type=Path, default=None, help="Override storage directory"
+    )
+
+    # GUI command (Seamless launcher)
+    gui = sub.add_parser(
+        "gui",
+        help="Launch the Shesha GUI in your browser",
+        description="Open the GUI served by the Bridge on port 8000",
+    )
+
     return parser
+
+
+def command_bridge(args: argparse.Namespace) -> None:
+    """Run the bridge server."""
+    from shesha.bridge.server import run_server
+
+    # Note: SecureConnect #31 - Loopback-only by default
+    run_server(host=args.host, port=args.port)
+
+
+def command_gui(args: argparse.Namespace) -> None:
+    """Launch the GUI with a seamless secret token."""
+    import webbrowser
+    import urllib.request
+    import urllib.error
+    import time
+
+    key = get_or_create_bridge_secret()
+    bridge_port = 8000
+    max_wait_seconds = 10
+    start_time = time.time()
+
+    # Check if Bridge is running on port 8000 (with retry for startup)
+    while True:
+        try:
+            req = urllib.request.Request(
+                f"http://127.0.0.1:{bridge_port}/api/health",
+                headers={"User-Agent": "librarian/cli"},
+                method="GET",
+            )
+            with urllib.request.urlopen(req, timeout=1) as resp:
+                if resp.status not in (200, 403):
+                    raise urllib.error.URLError("Bridge not responding")
+            break  # Success - Bridge is running
+        except urllib.error.HTTPError as e:
+            # 403 Forbidden is expected without auth - Bridge is running
+            if e.code == 403:
+                break  # Success
+            # Other HTTP errors mean Bridge isn't ready yet
+            if time.time() - start_time >= max_wait_seconds:
+                print("Error: Bridge is not running.", file=sys.stderr)
+                print("\nTo use the GUI, start the Bridge first:", file=sys.stderr)
+                print("  librarian bridge", file=sys.stderr)
+                raise SystemExit(2)
+            time.sleep(0.5)
+        except (urllib.error.URLError, TimeoutError):
+            if time.time() - start_time >= max_wait_seconds:
+                print("Error: Bridge is not running.", file=sys.stderr)
+                print("\nTo use the GUI, start the Bridge first:", file=sys.stderr)
+                print("  librarian bridge", file=sys.stderr)
+                raise SystemExit(2)
+            time.sleep(0.5)
+
+    url = f"http://localhost:{bridge_port}/?key={key}"
+
+    print(f"🚀 Launching GUI: {url}")
+    print("If browser doesn't open, copy and paste the URL above.")
+    webbrowser.open(url)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -754,7 +840,21 @@ def main(argv: list[str] | None = None) -> int:
         if not result.ok:
             print(result.details, file=sys.stderr)
             return 1
+
+        # Record where the operator chose to write the manifest/readme so the GUI bridge
+        # can find it even when started from a different working directory.
+        try:
+            set_manifest_dir(paths, manifest_dir.resolve())
+        except PermissionError:
+            # In restricted environments this may be blocked. The install can still succeed;
+            # the operator can set the manifest dir later via the GUI bridge settings.
+            pass
+        
+        # Ensure bridge secret is generated on install
+        get_or_create_bridge_secret(paths)
+        
         _print_install_summary(paths=paths, manifest_dir=manifest_dir)
+        _offer_path_setup()
         return 0
 
     if cmd == "mcp":
@@ -775,11 +875,23 @@ def main(argv: list[str] | None = None) -> int:
         storage_path = args.storage_path if args.storage_path is not None else resolved.storage
         core = LibrarianCore(storage_path=storage_path, model=args.model, api_key=args.api_key)
         try:
-            answer = core.query(args.project, args.question)
+            response = core.query(args.project, args.question, include_trace=args.trace)
         except (RuntimeError, SheshaError, ValidationError, ValueError) as e:
-            print(str(e), file=sys.stderr)
+            if args.json:
+                print(json.dumps({"error": str(e)}), file=sys.stderr)
+            else:
+                print(str(e), file=sys.stderr)
             return 2
-        print(answer)
+            
+        if args.json:
+            print(json.dumps(response, indent=2))
+        else:
+            if args.trace and "trace" in response:
+                for idx, step in enumerate(response["trace"]):
+                    print(f"\n[Step {idx+1}]")
+                    print(step)
+                print("\n--- Final Answer ---")
+            print(response["answer"])
         return 0
 
     if cmd == "projects":
@@ -790,7 +902,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.projects_cmd == "create":
             try:
-                core.create_project(args.project_id)
+                core.create_project(args.project_id, mount_path=getattr(args, "mount_path", None))
             except (SheshaError, ValidationError, ValueError) as e:
                 print(str(e), file=sys.stderr)
                 return 2
@@ -805,6 +917,27 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"status": "deleted", "project_id": args.project_id}, indent=2))
             return 0
 
+    if cmd == "mount":
+        storage_path = getattr(args, "storage_path", None) or resolved.storage
+        core = LibrarianCore(storage_path=storage_path)
+        if args.mount_cmd == "list":
+            # Show metadata (id + mount_path) for better "Working Code" visibility
+            metadata = core.list_projects_metadata()
+            print(json.dumps({"mounts": metadata}, indent=2))
+            return 0
+        if args.mount_cmd == "create":
+            try:
+                core.create_project(args.project_id, mount_path=args.mount_path)
+            except (SheshaError, ValidationError, ValueError) as e:
+                print(str(e), file=sys.stderr)
+                return 2
+            print(json.dumps({
+                "status": "mounted", 
+                "mount_id": args.project_id, 
+                "path": str(args.mount_path)
+            }, indent=2))
+            return 0
+
     if cmd == "upload":
         storage_path = args.storage_path if args.storage_path is not None else resolved.storage
         core = LibrarianCore(storage_path=storage_path)
@@ -814,6 +947,14 @@ def main(argv: list[str] | None = None) -> int:
             print(str(e), file=sys.stderr)
             return 2
         print(json.dumps({"uploaded": uploaded}, indent=2))
+        return 0
+
+    if cmd == "bridge":
+        command_bridge(args)
+        return 0
+
+    if cmd == "gui":
+        command_gui(args)
         return 0
 
     raise RuntimeError(f"Unhandled command: {cmd}")

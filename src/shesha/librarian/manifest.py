@@ -50,7 +50,7 @@ class LibrarianManifest:
         path.write_text(json.dumps(self.to_dict(), indent=2, sort_keys=True))
 
     @classmethod
-    def read(cls, path: Path) -> "LibrarianManifest":
+    def read(cls, path: Path) -> LibrarianManifest:
         data = json.loads(path.read_text())
 
         package = data.get("package") or {}

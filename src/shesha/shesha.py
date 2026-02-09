@@ -4,12 +4,11 @@ import atexit
 import re
 import weakref
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 import docker
 from docker.errors import DockerException
 
-from shesha.analysis import AnalysisGenerator
 from shesha.config import SheshaConfig
 from shesha.exceptions import RepoIngestError
 from shesha.models import ParsedDocument, ProjectInfo, RepoProjectResult
@@ -21,7 +20,6 @@ from shesha.sandbox.pool import ContainerPool
 from shesha.storage.filesystem import FilesystemStorage
 
 if TYPE_CHECKING:
-    from shesha.models import RepoAnalysis
     from shesha.parser.base import DocumentParser
 
 
@@ -60,7 +58,7 @@ class Shesha:
             keep_raw_files=config.keep_raw_files,
         )
         self._parser_registry = create_default_registry()
-        
+
         self._pool: ContainerPool | None = None
         if self._docker_available:
             self._pool = ContainerPool(
@@ -98,8 +96,8 @@ class Shesha:
     @staticmethod
     def _is_docker_available() -> bool:
         """Verify Docker daemon is running.
-        
-        Uses try/finally to ensure proper HTTP client cleanup.
+
+        Uses context manager to ensure proper HTTP client cleanup.
         """
         client = None
         try:
@@ -109,14 +107,14 @@ class Shesha:
         except DockerException:
             return False
         finally:
-            if client:
+            if client is not None:
                 client.close()
 
     @staticmethod
     def _check_docker_available() -> None:
         """Verify Docker daemon is running. Raises RuntimeError if not.
-        
-        Uses try/finally to ensure proper HTTP client cleanup.
+
+        Uses context manager to ensure proper HTTP client cleanup.
         """
         client = None
         try:
@@ -133,11 +131,11 @@ class Shesha:
                     "No Docker-compatible socket found. "
                     "If you're using Podman, set DOCKER_HOST to Podman's socket:\n"
                     '  export DOCKER_HOST="unix://$(podman machine inspect '
-                    '"--format \'{{.ConnectionInfo.PodmanSocket.Path}}\')"'
+                    "\"--format '{{.ConnectionInfo.PodmanSocket.Path}}')\""
                 ) from e
             raise
         finally:
-            if client:
+            if client is not None:
                 client.close()
 
     def create_project(self, project_id: str) -> Project:
@@ -188,8 +186,7 @@ class Shesha:
             project_id: ID of the project.
 
         Returns:
-            ProjectInfo with source URL, whether it's local, source existence,
-            and analysis status.
+            ProjectInfo with source URL, whether it's local, and source existence.
 
         Raises:
             ValueError: If project doesn't exist.
@@ -198,7 +195,6 @@ class Shesha:
             raise ValueError(f"Project '{project_id}' does not exist")
 
         source_url = self._repo_ingester.get_source_url(project_id)
-        analysis_status = self.get_analysis_status(project_id)
 
         if source_url is None:
             return ProjectInfo(
@@ -206,7 +202,6 @@ class Shesha:
                 source_url=None,
                 is_local=False,
                 source_exists=True,
-                analysis_status=analysis_status,
             )
 
         is_local = self._repo_ingester.is_local_path(source_url)
@@ -221,85 +216,7 @@ class Shesha:
             source_url=source_url,
             is_local=is_local,
             source_exists=source_exists,
-            analysis_status=analysis_status,
         )
-
-    def get_analysis_status(self, project_id: str) -> Literal["current", "stale", "missing"]:
-        """Check the status of a project's codebase analysis.
-
-        Args:
-            project_id: ID of the project.
-
-        Returns:
-            "current" if analysis exists and matches current HEAD SHA,
-            "stale" if analysis exists but HEAD SHA has changed,
-            "missing" if no analysis exists.
-
-        Raises:
-            ValueError: If project doesn't exist.
-        """
-        if not self._storage.project_exists(project_id):
-            raise ValueError(f"Project '{project_id}' does not exist")
-
-        analysis = self._storage.load_analysis(project_id)
-        if analysis is None:
-            return "missing"
-
-        current_sha = self._repo_ingester.get_saved_sha(project_id)
-        if current_sha is None:
-            return "current"
-
-        if analysis.head_sha == current_sha:
-            return "current"
-
-        return "stale"
-
-    def get_analysis(self, project_id: str) -> "RepoAnalysis | None":
-        """Get the codebase analysis for a project.
-
-        Args:
-            project_id: ID of the project.
-
-        Returns:
-            RepoAnalysis if it exists, None otherwise.
-
-        Raises:
-            ValueError: If project doesn't exist.
-        """
-        if not self._storage.project_exists(project_id):
-            raise ValueError(f"Project '{project_id}' does not exist")
-        return self._storage.load_analysis(project_id)
-
-    def get_project_sha(self, project_id: str) -> str | None:
-        """Get the saved HEAD SHA for a project.
-
-        Args:
-            project_id: ID of the project.
-
-        Returns:
-            The SHA string, or None if not available.
-        """
-        return self._repo_ingester.get_saved_sha(project_id)
-
-    def generate_analysis(self, project_id: str) -> "RepoAnalysis":
-        """Generate and store a codebase analysis for a project.
-
-        Args:
-            project_id: ID of the project to analyze.
-
-        Returns:
-            The generated RepoAnalysis.
-
-        Raises:
-            ValueError: If project doesn't exist.
-        """
-        if not self._storage.project_exists(project_id):
-            raise ValueError(f"Project '{project_id}' does not exist")
-
-        generator = AnalysisGenerator(self)
-        analysis = generator.generate(project_id)
-        self._storage.store_analysis(project_id, analysis)
-        return analysis
 
     def check_repo_for_updates(self, project_id: str) -> RepoProjectResult:
         """Check if a cloned repository has updates available.
@@ -386,11 +303,9 @@ class Shesha:
 
     def _extract_repo_name(self, url: str) -> str:
         """Extract repository name from URL."""
-        cleaned = url.rstrip("/")
         if self._repo_ingester.is_local_path(url):
-            path = Path(cleaned).expanduser().resolve()
-            return f"{path.parent.name}-{path.name}"
-        match = re.search(r"[/:]([^/]+/[^/]+?)(?:\.git)?$", cleaned)
+            return Path(url).expanduser().name
+        match = re.search(r"[/:]([^/]+/[^/]+?)(?:\.git)?$", url)
         if match:
             return match.group(1).replace("/", "-")
         return "unnamed-repo"

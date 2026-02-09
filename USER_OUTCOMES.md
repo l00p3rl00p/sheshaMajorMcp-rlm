@@ -91,6 +91,18 @@ The user can tell whether the tool works immediately after installing it, and re
 
 ---
 
+### 7. Production GUI Is Self-Contained and Stable
+**Guarantee:**  
+The reference GUI and Bridge provide a production-ready operator dashboard that functions without external internet dependencies.
+
+**Observable signals:**
+- All GUI assets (JS, CSS, fonts) are bundled locally
+- GUI functions completely offline (excluding external avatar APIs)
+- Bridge serves the GUI directly, eliminating the need for separate dev servers
+- Clear "Definition of Done" for GUI features ensuring full end-to-end functionality
+
+---
+
 ## What “Done” Means
 This repository is considered successful when:
 - A new user can install it and run Shesha RLM reliably

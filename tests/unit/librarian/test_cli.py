@@ -1,7 +1,5 @@
 """Tests for Librarian CLI helpers."""
 
-from pathlib import Path
-
 from shesha.librarian import cli
 
 
@@ -12,4 +10,3 @@ def test_sandbox_source_dir_points_to_dockerfile() -> None:
     dockerfile = sandbox_dir / "Dockerfile"
     assert dockerfile.exists()
     assert dockerfile.is_file()
-

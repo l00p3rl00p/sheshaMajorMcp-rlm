@@ -5,7 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.0] - 2026-02-07
+
+### Added
+- **Production-Ready GUI**: Fully bundled React app with zero external runtime dependencies.
+- **Unified Stack**: Bridge server now serves the GUI directly from `gui/dist`.
+- **Self-Hosted Assets**: Downloaded and bundled Inter, JetBrains Mono, and Space Grotesk fonts (offline-capable).
+- **Local Tailwind**: Integrated Tailwind v3 into the build pipeline, removing CDN dependency.
+- **Smart GUI Launcher**: 10s retry logic in `librarian gui` to allow Bridge startup time.
+- **Strict CSP**: Content Security Policy limited to `'self'` for all critical resources.
+- Comprehensive automated testing suite for `/gui` using Vitest and React Testing Library.
+- GUI testing integration in root `Makefile` (`make gui-test`).
+- Global `ErrorBoundary` to `/gui` for increased UI resilience.
+- Canonical documentation hierarchy for `/gui` (ARCHITECTURE, USER_OUTCOMES, CHANGELOG).
+
+### Fixed
+- Simplified `librarian gui` CLI command by removing obsolete port arguments and env vars.
+- Refactored `librarian gui` to verify Bridge health before launching browser.
+- Unified API client to use relative URLs when served by Bridge.
+- Regression: Converted Docker client context managers to `try/finally` for better platform compatibility and resource cleanup.
+- Audit Finding: Added error trapping for `FileReader` operations in the documentation upload screen.
+- Standardized documentation status in GUI code comments to clarify prototype vs. production behavior.
+
+## [0.4.0] - 2026-02-05
 
 ## [0.4.0] - 2026-02-05
 

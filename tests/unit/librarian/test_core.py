@@ -17,4 +17,3 @@ def test_upload_requires_existing_path(tmp_path: Path) -> None:
         core.upload("p1", tmp_path / "missing.txt")
 
     assert "not found" in str(exc_info.value).lower()
-
