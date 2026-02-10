@@ -2,8 +2,17 @@ import os
 import shutil
 import json
 import argparse
+import sys
 from pathlib import Path
 from typing import List
+
+# Import attach module for MCP removal
+try:
+    sys.path.append(str(Path(__file__).parent))
+    from attach import remove_from_clients
+    MCP_REMOVAL_AVAILABLE = True
+except ImportError:
+    MCP_REMOVAL_AVAILABLE = False
 
 class SheshaUninstaller:
     def __init__(self, project_root: Path, kill_venv: bool = False):
@@ -21,6 +30,10 @@ class SheshaUninstaller:
 
         with open(self.manifest_path, 'r') as f:
             manifest = json.load(f)
+
+        # Remove MCP attachments first (if any)
+        if "attached_clients" in manifest:
+            self.remove_mcp_attachments(manifest["attached_clients"])
 
         artifacts = manifest.get("install_artifacts", [])
         self.log(f"Found {len(artifacts)} tracked artifacts for removal.")
@@ -85,6 +98,27 @@ class SheshaUninstaller:
             self.log("Skipping virtual environment removal (use --kill-venv to remove).")
 
         self.log("Uninstall complete. System restored.")
+    
+    def remove_mcp_attachments(self, attached_clients: list):
+        """Remove MCP server entries from IDE configs"""
+        if not MCP_REMOVAL_AVAILABLE:
+            self.log("⚠️  MCP removal not available. Skipping IDE config cleanup.")
+            return
+        
+        self.log(f"Removing MCP attachments from {len(attached_clients)} IDE(s)...")
+        
+        # Extract server name from first entry (all should be the same)
+        if not attached_clients:
+            return
+        
+        server_name = attached_clients[0].get("server_key")
+        if not server_name:
+            return
+        
+        results = remove_from_clients(server_name, attached_clients)
+        
+        success_count = sum(1 for r in results if r.success)
+        self.log(f"Removed from {success_count}/{len(results)} IDE config(s)")
 
 def main():
     parser = argparse.ArgumentParser(description="Shesha Clean Room Uninstaller")

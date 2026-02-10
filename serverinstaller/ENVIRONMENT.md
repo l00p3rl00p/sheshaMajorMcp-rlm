@@ -32,3 +32,14 @@ Technical environment requirements and audit logic for the Shesha Clean Room Ins
 ### Docker Enforcement (`--docker-policy`)
 - `fail`: Hard abort if Docker is inaccessible.
 - `skip`: Proceed but disable sandbox-dependent features.
+
+## Standalone Tools
+
+### MCP JSON Injector
+**Purpose**: Manual MCP server configuration without breaking JSON syntax.
+
+**Requirements**:
+- Python 3.6+ (no external dependencies)
+- Write access to IDE config directories
+
+**Use Case**: When the main installer's auto-attachment isn't available or you need granular control over individual IDE configurations.

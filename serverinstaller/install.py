@@ -12,6 +12,14 @@ from typing import Dict, List, Optional, Any
 sys.path.append(str(Path(__file__).parent))
 from audit import EnvironmentAuditor
 
+# MCP Bridge imports (optional)
+try:
+    from bridge import MCPBridgeGenerator
+    from attach import attach_to_clients, detect_clients
+    MCP_AVAILABLE = True
+except ImportError:
+    MCP_AVAILABLE = False
+
 class SheshaInstaller:
     def __init__(self, args: argparse.Namespace):
         self.args = args
@@ -38,9 +46,21 @@ class SheshaInstaller:
             "gui_project": (self.project_root / "gui" / "package.json").exists(),
             "docker_project": (self.project_root / "Dockerfile").exists() or 
                              (self.project_root / "src" / "shesha" / "sandbox" / "Dockerfile").exists(),
+            "simple_script": False,
+            "script_path": None,
         }
         
-        self.log(f"Discovered: {', '.join([k for k, v in discovery.items() if v])}")
+        # Check if this is a simple script (no deps, single .py file)
+        if not discovery["python_project"] and not discovery["npm_project"]:
+            py_files = list(self.project_root.glob("*.py"))
+            if len(py_files) == 1:
+                script_file = py_files[0]
+                # Exclude installer scripts themselves
+                if script_file.name not in ["install.py", "uninstall.py", "audit.py", "verify.py"]:
+                    discovery["simple_script"] = True
+                    discovery["script_path"] = script_file
+        
+        self.log(f"Discovered: {', '.join([k for k, v in discovery.items() if v and k not in ['script_path']])} ")
         return discovery
 
     def setup_venv(self):
@@ -101,10 +121,247 @@ class SheshaInstaller:
             "version": "0.5.0-portable"
         }
         
+        # Add MCP attachments if any
+        if hasattr(self, 'mcp_attachments') and self.mcp_attachments:
+            manifest_data["attached_clients"] = self.mcp_attachments
+        
         with open(manifest_path, 'w') as f:
             json.dump(manifest_data, f, indent=2)
         
         self.log(f"Installation manifest written to {manifest_path}")
+
+    def generate_shell_wrapper(self, script_path: Path):
+        """Generate a lightweight install.sh for a simple script"""
+        script_name = script_path.stem
+        install_sh = self.project_root / "install.sh"
+        
+        wrapper_content = f"""#!/bin/bash
+set -e
+
+echo "🔧 Installing {script_name}..."
+echo ""
+
+# Check Python
+if ! command -v python3 &> /dev/null; then
+    echo "❌ Python 3 not found."
+    echo "   Install Python  3.6+ to continue."
+    exit 1
+fi
+
+# Make executable
+chmod +x {script_path.name}
+echo "✅ Made {script_path.name} executable"
+
+# Installation options
+echo ""
+echo "Installation Options:"
+echo "  1. Install to PATH (/usr/local/bin/{script_name})"
+echo "  2. Use in current directory (./{script_path.name})"
+echo ""
+read -p "Choose [1/2]: " -n 1 -r
+echo ""
+
+if [[ $REPLY == "1" ]]; then
+    if [ -w /usr/local/bin ]; then
+        cp {script_path.name} /usr/local/bin/{script_name}
+        echo "✅ Installed to /usr/local/bin/{script_name}"
+        echo ""
+        echo "🎉 Installation complete!"
+        echo "   Try: {script_name} --help"
+    else
+        echo "⚠️  Need sudo for /usr/local/bin"
+        sudo cp {script_path.name} /usr/local/bin/{script_name}
+        echo "✅ Installed to /usr/local/bin/{script_name}"
+        echo ""
+        echo "🎉 Installation complete!"
+        echo "   Try: {script_name} --help"
+    fi
+else
+    echo "✅ Ready to use in current directory"
+    echo ""
+    echo "🎉 Installation complete!"
+    echo "   Try: ./{script_path.name} --help"
+fi
+"""
+        
+        install_sh.write_text(wrapper_content)
+        install_sh.chmod(0o755)
+        self.log(f"Created install.sh wrapper at {install_sh}")
+        return install_sh
+
+    def handle_simple_script(self, discovery: Dict[str, Any]):
+        """Handle simple single-file scripts with user choice"""
+        script_path = discovery["script_path"]
+        
+        print(f"\n{'='*50}")
+        print(f"📄 Detected Simple Script: {script_path.name}")
+        print(f"{'='*50}\n")
+        print("This looks like a standalone script (no pyproject.toml/dependencies).")
+        print("")
+        print("Options:")
+        print("  1. Create install.sh wrapper (lightweight, recommended)")
+        print("  2. Package as full Python project (generate pyproject.toml + .venv)")
+        print("  3. Exit (leave as-is)")
+        print("")
+        
+        if self.args.headless:
+            choice = "1"  # Default to lightweight in headless mode
+            self.log("Headless mode: defaulting to lightweight wrapper")
+        else:
+            choice = input("Choose [1/2/3]: ").strip()
+        
+        if choice == "1":
+            # Lightweight wrapper
+            wrapper_path = self.generate_shell_wrapper(script_path)
+            print(f"\n✅ Created lightweight installer: {wrapper_path.name}")
+            print(f"   Try: ./install.sh")
+            
+            # Write minimal manifest
+            audit = self.auditor.audit()
+            audit_dict = {
+                "timestamp": audit.timestamp if hasattr(audit, 'timestamp') else str(audit),
+                "shell": audit.shell if hasattr(audit, 'shell') else "unknown",
+                "python_version": audit.python_version if hasattr(audit, 'python_version') else sys.version.split()[0],
+            }
+            
+            manifest_dir = self.project_root / ".librarian"
+            manifest_dir.mkdir(parents=True, exist_ok=True)
+            manifest_path = manifest_dir / "manifest.json"
+            
+            manifest_data = {
+                "install_date": audit_dict["timestamp"],
+                "install_type": "lightweight_wrapper",
+                "script_file": str(script_path),
+                "wrapper_file": str(wrapper_path),
+                "version": "0.5.0-portable"
+            }
+            
+            with open(manifest_path, 'w') as f:
+                json.dump(manifest_data, f, indent=2)
+            
+            self.log(f"Manifest written to {manifest_path}")
+            
+        elif choice == "2":
+            # Full packaging (generate pyproject.toml and proceed normally)
+            print("\n🔧 Generating pyproject.toml...")
+            script_name = script_path.stem
+            
+            pyproject_content = f"""[project]
+name = "{script_name}"
+version = "0.1.0"
+description = "Automatically generated package"
+requires-python = ">=3.6"
+
+[project.scripts]
+{script_name} = "{script_name}:main"
+"""
+            
+            pyproject_path = self.project_root / "pyproject.toml"
+            pyproject_path.write_text(pyproject_content)
+            print(f"✅ Created {pyproject_path}")
+            
+            # Re-discover and proceed with full install
+            discovery = self.discover_project()
+            self.setup_venv()
+            self.install_python_deps(discovery)
+            
+            audit = self.auditor.audit()
+            audit_dict = {
+                "timestamp": audit.timestamp if hasattr(audit, 'timestamp') else str(audit),
+                "shell": audit.shell if hasattr(audit, 'shell') else "unknown",
+                "python_version": audit.python_version if hasattr(audit, 'python_version') else sys.version.split()[0],
+            }
+            self.write_manifest(audit_dict)
+            print("\n✅ Full packaging complete!")
+            
+        else:
+            # Exit / do nothing
+            print("\n❎ Exiting. No changes made.")
+            sys.exit(0)
+
+    def handle_mcp_bridge(self, discovery: Dict[str, Any]):
+        """
+        Handle MCP bridge generation and IDE attachment.
+        
+        Logic:
+        1. Check if project has/needs MCP server
+        2. Generate bridge if requested
+        3. Attach to IDEs if requested
+        """
+        if not MCP_AVAILABLE:
+            self.log("⚠️  MCP bridge modules not available. Skipping MCP setup.")
+            return
+        
+        server_config = None
+        
+        # Step 1: Detect or generate MCP server
+        if self.args.generate_bridge:
+            # Generate bridge for legacy code
+            self.log("Generating MCP bridge for legacy code...")
+            generator = MCPBridgeGenerator(self.project_root)
+            bridge_path = generator.generate_bridge()
+            
+            if bridge_path:
+                server_config = {
+                    "name": self.project_root.name,
+                    "command": "python",
+                    "args": [str(bridge_path)]
+                }
+                self.artifacts.append(str(bridge_path))
+        else:
+            # Check if project already has an MCP server
+            # Look for common patterns: mcp_server.py, librarian mcp, package.json with mcp script
+            if (self.project_root / "mcp_server.py").exists():
+                server_config = {
+                    "name": self.project_root.name,
+                    "command": "python",
+                    "args": [str(self.project_root / "mcp_server.py")]
+                }
+            elif discovery.get("python_project") and (self.project_root / "src").exists():
+                # Check for Shesha/Librarian MCP server
+                librarian_mcp = self.project_root / "src" / "shesha" / "librarian" / "mcp.py"
+                if librarian_mcp.exists():
+                    server_config = {
+                        "name": "shesha",
+                        "command": str(self.project_root / ".venv" / "bin" / "librarian"),
+                        "args": ["mcp", "run"]
+                    }
+            elif discovery.get("npm_project"):
+                # Check package.json for MCP-related scripts
+                pkg_json = self.project_root / "package.json"
+                try:
+                    pkg_data = json.loads(pkg_json.read_text())
+                    # Common pattern: npx -y @package/name mcp
+                    if pkg_data.get("name"):
+                        server_config = {
+                            "name": pkg_data["name"],
+                            "command": "npx",
+                            "args": ["-y", pkg_data["name"], "mcp"]
+                        }
+                except:
+                    pass
+        
+        # Step 2: Attach to IDEs if requested
+        if server_config and self.args.attach_to:
+            client_list = None if "all" in self.args.attach_to else self.args.attach_to
+            
+            results = attach_to_clients(
+                server_config,
+                client_names=client_list,
+                interactive=not self.args.headless
+            )
+            
+            # Store attachment info in manifest
+            if not hasattr(self, 'mcp_attachments'):
+                self.mcp_attachments = []
+            
+            for result in results:
+                if result.success:
+                    self.mcp_attachments.append({
+                        "name": result.client_name,
+                        "config_path": str(result.config_path),
+                        "server_key": result.server_name
+                    })
 
     def setup_path(self, audit: Dict[str, Any]):
         """Offer to add Shesha to PATH with markers for surgical reversal."""
@@ -161,6 +418,11 @@ class SheshaInstaller:
 
         discovery = self.discover_project()
         
+        # Handle simple scripts (Philosophy: not every repo is a product)
+        if discovery["simple_script"]:
+            self.handle_simple_script(discovery)
+            return
+        
         # Component Selection
         install_choices = {
             "python": discovery["python_project"],
@@ -189,6 +451,10 @@ class SheshaInstaller:
         if install_choices["gui"]:
             self.setup_npm(discovery)
         
+        # MCP Bridge handling (if requested)
+        if self.args.generate_bridge or self.args.attach_to:
+            self.handle_mcp_bridge(discovery)
+        
         audit_dict = asdict(audit) if hasattr(audit, '__dict__') else audit
         if install_choices["python"]:
             self.setup_path(audit_dict)
@@ -204,6 +470,12 @@ def main():
     parser.add_argument("--docker-policy", choices=["fail", "skip"], default="skip")
     parser.add_argument("--storage-path", type=Path)
     parser.add_argument("--log-dir", type=Path)
+    
+    # MCP Bridge arguments
+    parser.add_argument("--generate-bridge", action="store_true", help="Generate MCP wrapper for legacy code")
+    parser.add_argument("--attach-to", nargs="+", 
+                       choices=["all", "claude", "xcode", "cursor", "codex", "aistudio", "vscode"],
+                       help="Attach MCP server to IDE(s)")
     
     args = parser.parse_args()
     

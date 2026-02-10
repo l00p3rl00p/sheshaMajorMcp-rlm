@@ -44,6 +44,23 @@ python serverinstaller/uninstall.py --kill-venv
 - **Registry**: Logs every file, directory, or shell configuration change.
 - **Integrity**: Essential for `uninstall.py` to achieve zero file-leak cleanup.
 
+### 4. Standalone Utilities
+
+#### MCP JSON Injector (`/mcp_injector.py`)
+- **Purpose**: Safely add/remove MCP server entries from IDE config files.
+- **Zero Dependencies**: Pure Python stdlib, no external packages.
+- **Surgical JSON**: Handles bracket/comma logic automatically.
+- **Portable**: Lives at repo root, completely independent of serverinstaller.
+- **Installation**: `./mcp_injector_install.sh` or use directly.
+
+### 5. MCP Bridge Generator (`bridge.py`)
+
+- **Purpose**: Wrap legacy automation code as MCP servers.
+- **Discovery**: Scans Python scripts for `if __name__ == "__main__"` blocks.
+- **Code Generation**: Creates `mcp_server.py` that exposes legacy functions as MCP tools.
+- **Soft Dependency**: Optionally uses `/mcp_injector.py` for auto-attachment to IDEs.
+- **Graceful Fallback**: Works standalone by printing manual configuration instructions.
+
 ## Constraints & Security
 
 - **Local-Only**: Bootstraps from the local repository state only. No remote template fetching.

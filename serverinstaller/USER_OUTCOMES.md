@@ -14,6 +14,7 @@ To provide a "Just Works" installation experience that creates a zero-leak, isol
 - **Surgical Integrity**: The `uninstall` command is not a hammer. It surgically reverses only the changes it made, ensuring the host system is returned to its exact pre-installation state.
 - **Trust through Transparency**: The operator (human or agent) can verify every change via the "Before/After" report. No stealth modifications to the PATH or Registry.
 - **Local Source Fidelity**: The installer treats the current repository state as the "source of truth." It never overwrites local experimental code with upstream templates.
+- **Standalone Utilities**: The `/serverinstaller` includes portable tools like the **MCP JSON Injector**, which can be used independently to safely modify IDE config files without breaking JSON syntax.
 
 ## High-Fidelity Signals
 
